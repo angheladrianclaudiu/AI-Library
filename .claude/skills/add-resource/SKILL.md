@@ -25,8 +25,13 @@ Copy this checklist and tick it off as you go:
 - [ ] 6. Write the content JSON
 - [ ] 7. Tags, PDF, build
 - [ ] 8. Verify
-- [ ] 9. Report and wait for approval
+- [ ] 9. Record what the session taught you
+- [ ] 10. Report and wait for approval
 ```
+
+Before step 1, read **`LEARNINGS.md`** in the repo root. It records which heuristics
+have broken and on what kind of source — including things you must check by hand
+because the extractor gets them wrong. It will save you rediscovering them.
 
 ### 1. Identify the source
 
@@ -165,7 +170,19 @@ the page you just made:
 python3 -m http.server 8000
 ```
 
-### 9. Report, then stop
+### 9. Record what the session taught you
+
+Append a section to **`LEARNINGS.md`** following the template at the bottom of that
+file: what the source looked like, what worked without intervention, what broke, and
+which constant or heuristic changed as a result. Every source has a different layout,
+and the next session's crops depend on this being honest — including the boring
+entries where nothing went wrong, since "single-column arXiv preprints extract cleanly"
+is itself worth knowing.
+
+If you hit something worth fixing but out of scope for this ingest, add it to
+**`TASKS.md`** rather than fixing it mid-page or letting it evaporate.
+
+### 10. Report, then stop
 
 Report: the page path, its read time and section count, which figures you kept
 and why, the tags, whether the PDF was committed or linked, and anything you

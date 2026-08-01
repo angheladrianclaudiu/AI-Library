@@ -51,6 +51,10 @@ data/library.json       metadata for every resource — the source of truth
 data/tags.json          the tag vocabulary
 inbox/                  drop folder (git-ignored)
 .claude/skills/add-resource/   the skill and its scripts
+
+CLAUDE.md               conventions and gotchas, for working on this repo
+TASKS.md                backlog for the skill, the extractors and the HTML
+LEARNINGS.md            what each extraction session taught us
 ```
 
 `index.html` is regenerated from `data/library.json`. Edit the JSON (or better,
