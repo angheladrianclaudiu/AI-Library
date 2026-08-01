@@ -247,6 +247,9 @@ def extract_embedded(doc, out_dir: Path, slug: str) -> list[dict]:
 # Artwork geometry, in PDF points (72pt = 1 inch).
 MIN_ART_SIDE = 28.0      # a 28pt mark is a logo or a bullet, not a figure
 CLUSTER_GAP = 42.0       # vertical whitespace that separates two figures
+TEXT_REACH = 14.0        # how far outside the artwork its own labels may sit
+MAX_TEXT_GROWTH = 34.0   # hard cap on how far text absorption may expand a crop
+MAX_LABEL_CHARS = 120    # longer than this and the block is prose, not a label
 
 
 def artwork_bbox(page, band: fitz.Rect) -> fitz.Rect | None:
@@ -294,22 +297,39 @@ def artwork_bbox(page, band: fitz.Rect) -> fitz.Rect | None:
     if box.width < 40 or box.height < 40:
         return None
 
-    # Two passes: absorb text overlapping the artwork, then re-absorb anything
-    # the enlarged box now touches (axis labels outside the plot frame).
+    # Absorb the text that belongs to the figure: labels inside the artwork,
+    # and axis labels or sub-captions sitting just outside it. Testing against
+    # a box grown by TEXT_REACH catches the latter — without it, the
+    # "Solution 1 / Solution 2" row under a diagram gets sliced off. Two passes,
+    # so text pulled in on the first can pull in its own neighbours.
+    #
+    # That reach is also how a crop goes wrong: an axis title reaches up to the
+    # caption of the table above, which then drags in the table itself. So the
+    # result is clamped to the artwork plus MAX_TEXT_GROWTH — near labels are
+    # kept, a neighbouring block two hops away is not.
+    limit = fitz.Rect(box.x0 - MAX_TEXT_GROWTH, box.y0 - MAX_TEXT_GROWTH,
+                      box.x1 + MAX_TEXT_GROWTH, box.y1 + MAX_TEXT_GROWTH)
     try:
+        # Only short blocks are eligible. A figure's own text — axis titles,
+        # legends, node labels, "Solution 1" — is always brief; a neighbouring
+        # caption or body paragraph is not, and absorbing one drags a slab of
+        # prose into the crop.
         blocks = [
             fitz.Rect(b[:4])
             for b in page.get_text("blocks")
             if len(b) >= 5 and str(b[4]).strip()
+            and len(str(b[4]).strip()) <= MAX_LABEL_CHARS
         ]
         for _ in range(2):
+            reach = fitz.Rect(box.x0 - TEXT_REACH, box.y0 - TEXT_REACH,
+                              box.x1 + TEXT_REACH, box.y1 + TEXT_REACH)
             for rect in blocks:
-                if rect in band and rect.intersects(box):
+                if rect in band and rect.intersects(reach):
                     box |= rect
     except Exception:
         pass
 
-    return box & band
+    return box & band & limit
 
 
 def extract_regions(doc, out_dir: Path, slug: str) -> list[dict]:

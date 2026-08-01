@@ -134,6 +134,18 @@ page; more and they stop standing out.
 <ol class="biblio"><li id="r1">Author et al. <em>Title</em>. Venue, 2017.</li></ol>
 ```
 
-Tables must be wrapped in `.table-scroll` — otherwise a wide table pushes the
-whole page sideways on a phone. Every `class="cit"` needs a matching `id` in
-the bibliography; `make_page.py` does not check this for you, so check it.
+Tables always go inside `.table-scroll` — otherwise a wide table pushes the
+whole page sideways on a phone. Two modifiers matter for results tables:
+
+```html
+<div class="table-scroll wide"><table class="numeric">…</table></div>
+```
+
+`class="numeric"` on the table stops cells breaking mid-value, so `0.68 ± 0.20`
+stays on one line — leave it off for tables whose cells hold prose. `wide` on the
+wrapper lets the table use the right margin on large screens, the same escape
+`figure.wide` gets; use it when a results table has more than about four columns,
+or the last column ends up clipped inside the scroll box.
+
+Every `class="cit"` needs a matching `id` in the bibliography; `make_page.py`
+does not check this for you, so check it.

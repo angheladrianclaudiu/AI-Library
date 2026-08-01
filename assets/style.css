@@ -174,7 +174,7 @@ a:hover { color: var(--accent-ink); }
   align-items: center;
   gap: 1rem;
   padding: .75rem var(--page-pad);
-  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  background: color-mix(in srgb, var(--bg) 96%, transparent);
   backdrop-filter: saturate(1.4) blur(10px);
   border-bottom: 1px solid var(--rule);
   font-family: var(--font-ui);
@@ -287,7 +287,7 @@ a:hover { color: var(--accent-ink); }
   position: sticky;
   top: 3.3rem;
   z-index: 40;
-  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  background: color-mix(in srgb, var(--bg) 96%, transparent);
   backdrop-filter: saturate(1.4) blur(10px);
   padding: 1rem 0 .9rem;
   border-bottom: 1px solid var(--rule);
@@ -547,6 +547,8 @@ a:hover { color: var(--accent-ink); }
   color: var(--ink-faint);
 }
 .hero__meta .dot { color: var(--rule-strong); }
+/* Tags always start their own row, so the row above never ends on a separator. */
+.hero__tags { flex-basis: 100%; color: var(--ink-faint); }
 
 .srclinks {
   display: flex;
@@ -770,9 +772,11 @@ figcaption .figsrc {
    held back to the reading measure. Browsers without :has() simply keep the
    figure at measure width, which is a fine fallback. */
 @media (min-width: 1180px) {
-  .doc section:has(> figure.wide) { grid-column: 2 / 4; }
-  .doc section:has(> figure.wide) > :not(figure.wide) { max-width: var(--measure); }
-  figure.wide { max-width: none; }
+  .doc section:has(> figure.wide, > .table-scroll.wide) { grid-column: 2 / 4; }
+  .doc section:has(> figure.wide, > .table-scroll.wide) > :not(figure.wide):not(.table-scroll.wide) {
+    max-width: var(--measure);
+  }
+  figure.wide, .table-scroll.wide { max-width: none; }
 }
 
 /* Equations — no KaTeX. Unicode notation plus a plain-English reading. */
@@ -886,6 +890,11 @@ th {
   white-space: nowrap;
 }
 td { color: var(--ink-soft); }
+
+/* Results tables: keep values like "0.68 ± 0.20" on one line. Without this the
+   cell breaks at the space and the number becomes hard to read. Prose tables
+   omit the class so their cells still wrap; .table-scroll absorbs the width. */
+table.numeric td { white-space: nowrap; }
 tbody tr:hover td { background: var(--bg-sunken); }
 
 /* Glossary */

@@ -122,14 +122,26 @@ def build_source_links(content: dict) -> str:
 
 
 def build_meta_line(content: dict, minutes: int) -> str:
+    """Read time (plus venue/year only when the byline didn't already carry them),
+    then tags on their own row.
+
+    The tags go in their own element rather than being joined into the same
+    separator list: the row wraps, and a joined list leaves a stranded "·" at
+    the end of the first line.
+    """
     bits = [f"{minutes} min read"]
-    if content.get("year"):
-        bits.append(str(content["year"]))
-    if content.get("venue"):
-        bits.append(content["venue"])
+    if not content.get("authors"):
+        # No byline, so this line has to carry the provenance.
+        if content.get("year"):
+            bits.append(str(content["year"]))
+        if content.get("venue"):
+            bits.append(content["venue"])
+
+    line = ' <span class="dot">·</span> '.join(esc(b) for b in bits)
     if content.get("tags"):
-        bits.append(" · ".join(content["tags"]))
-    return ' <span class="dot">·</span> '.join(esc(b) for b in bits)
+        tags = " · ".join(esc(t) for t in content["tags"])
+        line += f'<span class="hero__tags">{tags}</span>'
+    return line
 
 
 def main() -> int:
