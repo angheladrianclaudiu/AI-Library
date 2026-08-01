@@ -1,0 +1,19 @@
+# Drop folder for source PDFs and saved articles — contents never committed,
+# but the folder itself ships so a fresh clone has somewhere to drop files.
+inbox/*
+!inbox/.gitkeep
+
+# Extractor working files
+*.text.json
+*.figures.json
+*.content.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# OS noise
+.DS_Store
+Thumbs.db
