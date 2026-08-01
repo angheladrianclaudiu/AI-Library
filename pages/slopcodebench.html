@@ -1,0 +1,709 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SlopCodeBench: How Coding Agents Degrade Over Long-Horizon Tasks — AI Library</title>
+<meta name="description" content="Agents were made to extend their own code across up to eight rounds of changing specifications. None finished a single problem, and what they left behind got measurably worse every round — while human repositories stayed flat.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#129504;</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem("ail-theme");
+      if (t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t);
+    } catch (e) {}
+  })();
+</script>
+</head>
+<body>
+
+<div id="progress"></div>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="topbar">
+  <a class="topbar__home" href="../index.html">
+    <span class="topbar__mark" aria-hidden="true">AI</span>
+    <span>AI Library</span>
+  </a>
+  <span class="topbar__crumb">SlopCodeBench: How Coding Agents Degrade Over Long-Horizon Tasks</span>
+  <span class="topbar__spacer"></span>
+  <button class="theme-toggle" type="button" aria-label="Toggle dark and light theme">
+    <span class="icon-light" aria-hidden="true">☾</span>
+    <span class="icon-dark" aria-hidden="true">☀</span>
+  </button>
+</header>
+
+<main id="main" class="doc">
+
+  <div class="hero">
+    <p class="hero__kicker">
+      <span class="badge badge--paper">Paper</span>
+    </p>
+    <h1>SlopCodeBench: How Coding Agents Degrade Over Long-Horizon Tasks</h1>
+    <p class="hero__authors">Gabriel Orlanski, Devjeet Roy, Alexander Yun, Changho Shin, Alex Gu, Albert Ge, Dyah Adila, Frederic Sala, Aws Albarghouthi <span class="hero__venue">· arXiv preprint · 2026</span></p>
+    <p class="hero__meta">23 min read<span class="hero__tags">benchmarks · coding-agents · code-quality · evaluation · long-horizon</span></p>
+    <p class="srclinks"><a class="srclink" href="https://arxiv.org/abs/2603.24755" target="_blank" rel="noopener">↗ Original paper</a>
+      <a class="srclink" href="../assets/pdf/slopcodebench.pdf">⬇ PDF in this repo</a>
+      <a class="srclink" href="https://www.scbench.ai" target="_blank" rel="noopener">↗ Benchmark site</a></p>
+  </div>
+
+  <div class="tldr">
+    <h2>In short</h2>
+    <p>Coding benchmarks evaluate one artifact against one specification, which measures whether an agent can write working code but not whether that code survives the next requirement. SlopCodeBench closes the loop: 20 problems, 93 checkpoints, and at every step the agent gets the next specification plus <em>its own</em> previous workspace, with the tests hidden and the internal design left entirely to it.</p>
+    <p>Across 11 models, no agent solved a single problem end to end — the best per-checkpoint strict rate was 17.2%. Two new metrics track quality at every step: <strong>structural erosion</strong> (how much of a codebase's complexity is concentrated in already-complex functions) and <strong>verbosity</strong> (redundant and duplicated lines). Erosion rose in 80% of trajectories and verbosity in 89.8%. Against 48 maintained Python repositories, agent code is 2.2× more verbose — and the gap widens with every iteration while the human repositories stay flat.</p>
+    <p>Prompts that explicitly demand clean code lower the starting point by about a third and leave the rate of decay untouched, without improving pass rates and while costing up to 48% more.</p>
+  </div>
+
+  <details class="toc" open>
+    <summary>Contents</summary>
+    <ol>
+      <li><a href="#the-problem">The problem: benchmarks test the first draft, never the second</a></li>
+      <li><a href="#how-the-benchmark-works">How SlopCodeBench works</a></li>
+      <li><a href="#measuring-slop">Putting a number on “slop”</a></li>
+      <li><a href="#correctness-results">Result 1: nobody finishes, and it gets more expensive</a></li>
+      <li><a href="#degradation-results">Result 2: quality degrades, and the mechanism is visible</a></li>
+      <li><a href="#versus-humans">Result 3: human repositories do not do this</a></li>
+      <li><a href="#prompting">Result 4: better prompts move the intercept, not the slope</a></li>
+      <li><a href="#why-it-matters">Why this matters</a></li>
+      <li><a href="#limitations">Limitations and open questions</a></li>
+      <li><a href="#glossary">Glossary</a></li>
+      <li><a href="#sources">Sources</a></li>
+    </ol>
+  </details>
+
+  <section id="the-problem">
+    <h2><span class="sec-num">01</span>The problem: benchmarks test the first draft, never the second</h2>
+
+<p class="lead">Almost every benchmark for coding agents asks the same question: given a complete
+specification, can the model produce code that passes a test suite? Real software development
+almost never looks like that. You write something, it works, and then the requirements change —
+and the code you wrote the first time either absorbs the change or fights it.</p>
+
+<p>The authors open with an example that anyone who has shipped software will recognise. You build
+a code search tool on regular expressions. It works. Then someone asks for structural pattern
+matching — searching for the <em>shape</em> of code rather than its text — and regular expressions
+cannot express that. The feature is not an addition; it is a rewrite. The cost was not incurred
+when you were asked for the new feature. It was incurred months earlier, when you chose regexes.</p>
+
+<p>A single-shot benchmark cannot see that cost. It evaluates one artifact against one
+specification. Whether the code is a clean, extensible design or a 1,000-line function that happens
+to produce the right output, the score is identical. As the paper puts it, existing benchmarks
+measure "whether an agent can produce correct code for the current specification, not whether that
+code remains extensible under future change."</p>
+
+<p>There is reason to think this matters specifically for agents. Prior work has found that language
+models favour verbose constructions over concise idioms, and that each editing turn tends to
+preserve and extend the anti-patterns of the turn before it. The colloquial name for the result —
+high-volume, low-quality code — is <strong>slop</strong>, and it supplies the benchmark's name.</p>
+
+<h3>Why existing "iterative" benchmarks do not close the gap</h3>
+
+<p>Several recent benchmarks do move past single-shot evaluation, and the paper's argument is
+essentially that each of them breaks the causal chain it needs to preserve. The distinction is worth
+following closely, because it is the paper's main design contribution.</p>
+
+<ul>
+  <li>Some benchmarks decompose a single monolithic solution into dependency-ordered subproblems.
+      The agent works through them in order, but the architecture was fixed in advance by whoever
+      did the decomposing.</li>
+  <li>Some supply gold-standard reference code for prior turns. The agent's turn-three input is a
+      clean human implementation, not the thing it actually built at turn two — so it never
+      inherits its own mistakes.</li>
+  <li>Some draw tasks from the commit histories of real open-source repositories. These are useful
+      for studying maintenance work, but the agent is editing a codebase humans designed, along an
+      evolution path humans already walked. It never pays for its own early decisions. These also
+      carry contamination risk, since frontier training data plausibly includes both the repositories
+      and their histories.</li>
+  <li>Some apply a single modification, so no trajectory ever forms.</li>
+</ul>
+
+<p>The common thread: for compounding to be observable, the agent's own output has to be the input
+to the next step, with nothing cleaning it up in between.</p>
+  </section>
+
+  <section id="how-the-benchmark-works">
+    <h2><span class="sec-num">02</span>How SlopCodeBench works</h2>
+
+<p>SlopCodeBench contains <strong>20 problems spanning 93 checkpoints</strong>. A problem is an
+ordered list of checkpoints; each checkpoint pairs a written specification with a hidden test suite.
+The agent implements the first specification from an empty directory, and from then on each
+checkpoint hands it the next specification plus <em>its own previous workspace</em>.</p>
+
+<div class="eq">
+  <div class="eq__math">y₁ = πθ(x₁, y₀)
+y₂ = πθ(x₂, y₁)
+    ⋮
+yᵢ = πθ(xᵢ, yᵢ₋₁)</div>
+  <div class="eq__read"><strong>In words</strong>The agent πθ produces workspace y₁ from the first
+  specification x₁ and an empty starting workspace y₀. For every checkpoint after that, its input is
+  the next specification and the workspace it produced last time. A bad decision at step i is the
+  foundation of step i+1 — there is no reset.</div>
+</div>
+
+<figure class="wide">
+  <img src="../assets/images/slopcodebench/fig-p02-figure-1.webp" alt="Three specifications flow left to right into three solutions. Solution 1 is two small clean files. Solution 2 adds 100 and 60 lines and is tinted orange, labelled Degradation Begins. Solution N adds 260 and 150 lines and is tinted red, labelled Unmaintainable." width="1124" height="433">
+  <figcaption><span class="figlabel">Figure 1</span>The whole benchmark in one picture. Each new specification is applied to the agent's own previous output, and the diffs grow as the trajectory goes on. The colour shift from white to red is the phenomenon the paper is trying to put a number on — the point is that the test suite can stay green the entire way across.<span class="figsrc">Extracted from page 2 of the paper.</span></figcaption>
+</figure>
+
+<p>Between checkpoints, only the working directory survives. Each checkpoint runs in a fresh Docker
+container: installed packages, shell history and agent session data are all wiped, and the previous
+conversation is not replayed. The agent has to re-derive its understanding of the project from the
+code itself. The authors frame this as simulating "the common development pattern of returning to a
+project after time away," and it is what forces the code's structure — rather than the agent's
+memory — to carry the design.</p>
+
+<h3>Four design rules</h3>
+
+<p>The benchmark's problems all obey four constraints, and each one exists to close a specific leak:</p>
+
+<ul>
+  <li><strong>No prescribed internal interfaces.</strong> Specifications fix only the external
+      contract — command-line arguments, or an HTTP API's inputs and outputs. Benchmarks that hand
+      the model a function signature have already made the architectural decision that this
+      benchmark is trying to measure.</li>
+  <li><strong>No visible test suite.</strong> Agents see specification prose and worked examples,
+      never the tests or their output. This is a sharp break from the dominant paradigm, where
+      fail-to-pass tests are provided. Tests leak architectural hints, and they let an agent
+      converge by trial and error rather than by understanding the spec.</li>
+  <li><strong>Black-box and language-agnostic.</strong> Problems constrain observable behaviour
+      only, so they could be implemented in any language. Output comparison normalises away
+      inconsequential differences such as key ordering or match sorting, so an agent is not
+      penalised for an arbitrary choice the spec did not pin down.</li>
+  <li><strong>Synthetic problems.</strong> Because the problems are written for the benchmark rather
+      than lifted from GitHub, there is no training-data contamination to argue about.</li>
+</ul>
+
+<h3>The running example</h3>
+
+<p>The paper uses one problem, <code>code_search</code>, throughout. It asks for a command-line tool
+that searches source files for patterns, in the spirit of <code>ast-grep</code>, across five
+checkpoints:</p>
+
+<div class="table-scroll">
+<table>
+  <thead><tr><th>Checkpoint</th><th>What it adds</th></tr></thead>
+  <tbody>
+    <tr><td>C1</td><td>Python files only; exact-string and regular-expression rules</td></tr>
+    <tr><td>C2</td><td>JavaScript and C++ support</td></tr>
+    <tr><td>C3</td><td>Structure-aware pattern matching with metavariable capture</td></tr>
+    <tr><td>C4</td><td>Selector rules and automatic fix application</td></tr>
+    <tr><td>C5</td><td>Go, Rust and Java support</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>The trap is deliberate and it is set at C1. An agent that inlines file discovery and hardcodes
+<code>*.py</code> passes every C1 test. It then has to restructure before it can add a second
+language at C2, and again at C5. An agent that builds a language-dispatch interface at C1 does not.
+Both score 100% at C1.</p>
+
+<div class="callout callout--intuition">
+  <span class="callout__label">Intuition</span>
+  <p>This is the whole design in miniature. The benchmark is not trying to find tasks agents cannot
+  do. It is trying to build tasks where the <em>score at step one tells you nothing</em> about how
+  much trouble you are in at step five.</p>
+</div>
+
+<h3>How a checkpoint is scored</h3>
+
+<p>Tests are grouped into four kinds: <strong>core</strong> (behaviour the specification explicitly
+describes or demonstrates), <strong>error</strong> (failure-mode handling), <strong>functionality</strong>
+(hidden tests that check correctness exhaustively), and <strong>regression</strong> (every test from
+every earlier checkpoint). Because regression tests accumulate, one mistake at C2 can zero out every
+later checkpoint even if the later work is fine — so three headline numbers are reported:</p>
+
+<ul>
+  <li><strong>Strict</strong> — passes everything, regression tests included.</li>
+  <li><strong>Isolated (Iso)</strong> — passes this checkpoint's own tests, ignoring regressions.</li>
+  <li><strong>Core</strong> — passes only the behaviour the specification actually spelled out.</li>
+</ul>
+
+<p>Since problems have between three and eight checkpoints, raw checkpoint numbers are not comparable
+across problems. Every trajectory is mapped onto five phases — Start, Early, Mid, Late, Final — and
+all the charts below use that binning.</p>
+  </section>
+
+  <section id="measuring-slop">
+    <h2><span class="sec-num">03</span>Putting a number on “slop”</h2>
+
+<p>The interesting part of the paper is not the pass rates. It is the attempt to measure code
+quality in a way that is computable at every checkpoint, comparable across agents and problems, and
+not simply a proxy for "more code". Two metrics do that work.</p>
+
+<h3>Structural erosion</h3>
+
+<p>The failure mode being targeted is specific: agents under iteration tend to patch new logic into
+functions that already exist rather than distributing it into new, focused ones. Over several
+checkpoints this produces a small number of enormous functions carrying most of the program's
+decision-making.</p>
+
+<p>Erosion is defined as the share of a codebase's total "complexity mass" that sits inside
+high-complexity functions. Each callable gets a mass:</p>
+
+<div class="eq">
+  <div class="eq__math">mass(f) = CC(f) × √SLOC(f)</div>
+  <div class="eq__read"><strong>In words</strong>A function's weight is its cyclomatic complexity —
+  roughly, the number of independent paths through it, so a count of its branching — multiplied by
+  the square root of its line count. The square root deliberately flattens the size term, so that a
+  long but straight-line function does not outweigh a short, deeply branched one. Complexity is
+  meant to dominate; length only modulates it.</div>
+</div>
+
+<div class="eq">
+  <div class="eq__math">Erosion  =  Σ mass(f) for all f where CC(f) > 10
+             ─────────────────────────────────
+                    Σ mass(f) for all f</div>
+  <div class="eq__read"><strong>In words</strong>Add up the mass of every function whose cyclomatic
+  complexity exceeds 10, and divide by the total mass of every function in the codebase. The result
+  runs from 0 to 1 and answers one question: what fraction of this program's complexity is
+  concentrated in its already-complex functions? The cutoff of 10 follows the default threshold in
+  Radon, a widely used Python analysis tool.</div>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__label">Note</span>
+  <p>Erosion is a <em>ratio</em>, not a total. A codebase can double in size with no change in
+  erosion, provided the new complexity is spread across new functions. It rises only when
+  complexity piles into the places that were already complex — which is precisely the "just add
+  another <code>elif</code>" failure mode.</p>
+</div>
+
+<h3>Verbosity</h3>
+
+<p>The second dimension is code that says little with many lines: copy-paste, redundant scaffolding,
+intermediate variables that carry no information. It is measured in two parts — a set of
+<strong>137 hand-written AST-grep rules</strong> that flag known-wasteful constructions, plus
+detection of duplicated (clone) lines.</p>
+
+<div class="eq">
+  <div class="eq__math">Verbosity  =  | flagged lines ∪ clone lines |
+              ────────────────────────────
+                        LOC</div>
+  <div class="eq__read"><strong>In words</strong>Take every line caught by a wasteful-pattern rule,
+  union it with every line that is a duplicate of another, count the result once — the union matters,
+  since a line hit by three rules should count once — and divide by the total lines of code. Also
+  bounded between 0 and 1, so runs of different sizes are comparable.</div>
+</div>
+
+<p>The examples the paper gives are recognisable: an identity list comprehension where a filter would
+do, an emptiness check before a loop that would simply not execute, a single-use variable assigned
+and immediately consumed. Individually trivial; the claim is that they accumulate.</p>
+
+<div class="callout callout--caveat">
+  <span class="callout__label">Worth keeping in mind</span>
+  <p>Both metrics are static heuristics, not measurements of maintainability. Cyclomatic complexity
+  is a decades-old proxy with well-known limitations, and the 137 AST-grep rules encode a particular
+  view of what wasteful Python looks like. The authors report a sensitivity analysis — varying the
+  complexity cutoff across 8, 10 and 12, and the size term across none, √SLOC and linear SLOC — and
+  find the conclusions stable across all nine variants. That tests robustness to the parameters, not
+  whether the metric captures what a maintainer would call quality.</p>
+</div>
+  </section>
+
+  <section id="correctness-results">
+    <h2><span class="sec-num">04</span>Result 1: nobody finishes, and it gets more expensive</h2>
+
+<p>Eleven models were evaluated across 25 configurations, each through its provider's own CLI harness
+— Claude Code for Anthropic models and GLM 4.7, Codex CLI for OpenAI models — rather than a
+research agent framework. The reasoning was that frontier models are trained for their native
+harness, and that this is how developers actually use them. Each checkpoint got a two-hour wall-clock
+limit, no cap on turns or spending, and a minimal prompt that asked only for a working entry point
+and an up-to-date <code>requirements.txt</code>.</p>
+
+<p>The headline result is blunt: <strong>no agent solved a single problem end to end.</strong> Not
+one of 25 configurations passed every test at every checkpoint of any of the 20 problems. The best
+per-checkpoint strict solve rate was <strong>17.2%</strong>, from Opus 4.6. Isolated solve rates
+ranged from 7.5% to 23.7%, core rates from 19.4% to 53.8%.</p>
+
+<figure class="wide">
+  <img src="../assets/images/slopcodebench/fig-p07-figure-2.webp" alt="Two line charts. Left: three declining lines labelled Core, Iso and Strict, with a shaded region marked 29pp gap between Core and Iso; Strict falls to near zero by Final. Right: mean cost per checkpoint rising from $1.46 at Start to $4.17 at Final." width="1134" height="389">
+  <figcaption><span class="figlabel">Figure 2</span>Correctness falls and spending rises along the same axis. The gap between the Core line (only behaviour the spec described) and the Iso line (the checkpoint's full hidden suite) widens from 1.4× to 13.3× — agents keep doing what they were told while getting steadily worse at everything that was implied. The Strict line reaching the floor is regression damage: earlier checkpoints breaking as later ones are built.<span class="figsrc">Extracted from page 7 of the paper.</span></figcaption>
+</figure>
+
+<p>Three things are worth separating here.</p>
+
+<p><strong>The core-versus-isolated gap widens dramatically.</strong> At the first checkpoint agents
+pass the full suite almost as often as they pass the demonstrated-behaviour subset. By the last, they
+are 13.3× more likely to pass core tests than the complete set. The agents keep satisfying the letter
+of each specification while increasingly failing everything the specification implied but did not
+spell out.</p>
+
+<p><strong>Strict solve rates collapse to 0.5% by the final checkpoint.</strong> Since strict scoring
+includes every earlier checkpoint's tests, this is largely regression damage — new features breaking
+old ones.</p>
+
+<p><strong>Cost grows 2.9×</strong> across the trajectory, from a mean of $1.46 per checkpoint at the
+start to $4.17 at the end, and buys no additional correctness. The agent is working harder against
+its own accumulated code.</p>
+
+<figure>
+  <img src="../assets/images/slopcodebench/fig-p23-figure-6.webp" alt="Line chart of pass rate by test type across five progress bins. The Error line stays highest, falling from about 84 to 70. Core falls from about 76 to 51 and Functionality from about 73 to 46." width="584" height="415">
+  <figcaption><span class="figlabel">Figure 6</span>Pass rate broken out by test type. This chart is from the appendix, and it is the one place where the paper's own description and its plotted data appear to disagree — see the note below.<span class="figsrc">Extracted from page 23 of the paper.</span></figcaption>
+</figure>
+
+<div class="callout callout--caveat">
+  <span class="callout__label">A discrepancy worth flagging</span>
+  <p>The body text states that "error-handling tests account for most of the decline while core and
+  functionality pass rates remain comparatively stable," and Figure 6's own caption says that "core
+  and functionality tests remain high across checkpoints while error-handling pass rates decline."
+  As plotted, the error line is the <em>highest</em> of the three throughout and falls by roughly
+  14 points, while core falls about 25 and functionality about 27. On the figure as drawn, core and
+  functionality degrade more than error handling does, not less. This looks like a wording error
+  rather than a data problem — the surrounding argument does not depend on it — but a reader should
+  not take the sentence at face value against the chart. This is a v1 preprint.</p>
+</div>
+  </section>
+
+  <section id="degradation-results">
+    <h2><span class="sec-num">05</span>Result 2: quality degrades, and the mechanism is visible</h2>
+
+<p>The central question is whether quality actually deteriorates along a trajectory. It does.
+<strong>Erosion rises in 80% of trajectories and verbosity in 89.8%.</strong></p>
+
+<figure class="wide">
+  <img src="../assets/images/slopcodebench/fig-p08-figure-3.webp" alt="Four line charts showing erosion and verbosity rising across progress bins for three Anthropic models and three OpenAI models. Every line trends upward." width="1300" height="359">
+  <figcaption><span class="figlabel">Figure 3</span>Six representative models, three from each provider. What matters here is not the ranking but that every line points the same way — this is not one model's quirk or one provider's training artefact.<span class="figsrc">Extracted from page 8 of the paper.</span></figcaption>
+</figure>
+
+<p>The mechanism is not simply that there is more code. It is concentration. Across trajectories the
+mean number of high-complexity functions rises from <strong>4.1 to 37.0</strong>, and the mean
+maximum cyclomatic complexity in a codebase rises from <strong>27.1 to 68.2</strong>. Programs are
+not just growing; their decision-making is collapsing into a handful of places.</p>
+
+<p>For verbosity, structural duplication does most of the work — up 66%, across 72.1% of
+trajectories — while the density of AST-grep rule violations grows a more modest 15.6%. In other
+words, agents are not becoming dramatically worse line by line. They are copying and pasting.</p>
+
+<h3>What this looks like in one function</h3>
+
+<p>The paper's most memorable illustration comes from the <code>circuit_eval</code> problem. Over
+eight checkpoints, Opus 4.6's <code>main()</code> grew from 84 lines to <strong>1,099 lines</strong>,
+and its cyclomatic complexity from 29 to <strong>285</strong> — a tenfold increase. By the final
+checkpoint it was a single dispatcher containing nine command branches, each repeating the same
+argument-parsing scaffold rather than sharing it:</p>
+
+<pre><code>def main():                    # 1,099 lines, CC = 285
+    # global flags, --format, --seed    (127 lines of
+    # while-loop arg extraction          boilerplate)
+    command = args[0]
+    if command == 'check':     #  31 lines
+    elif command == 'eval':    # 141 lines
+    elif command == 'stats':   #  31 lines
+    elif command == 'lint':    #  47 lines
+    elif command == 'dot':     #  66 lines
+    elif command == 'cone':    #  88 lines
+    elif command == 'truth-table':  # 141 lines
+    elif command == 'equiv':   # 117 lines
+    elif command == 'opt':     # 312 lines, 13 flags, same pattern repeated
+    else: ...                  #   6 lines</code></pre>
+
+<p>Every one of those branches was added by an agent that had just read this function and decided the
+cheapest way to add a feature was one more <code>elif</code>. That is exactly what the erosion metric
+is built to detect, and it is a decision that no test suite penalises.</p>
+
+<h3>Early decisions really do compound</h3>
+
+<p>The <code>code_search</code> problem provides the cleanest evidence that step-one choices
+determine step-five outcomes. All seven configurations scored 100% at both C1 and C2 — but their
+implementations already differed, some building extensible dispatch and others hardcoding the
+initial rule kinds. At C3, when structure-aware metavariable patterns arrived, the field split into
+three tiers: Opus 4.6 held 90.9%, four configurations clustered at 81.8–88.6%, and GPT 5.2 Codex and
+GPT 5.3 Spark collapsed to 52.3%, failing every core test. By C5 that bottom tier's failures had
+grown from 21 to 40.</p>
+
+<p>Two more cases point the same way. On <code>eve_industry</code>, Opus 4.6 spent more than double
+any other configuration at C2 to get exact fractional arithmetic right, then posted three
+consecutive perfect checkpoints and led at C6. On <code>dag_execution</code>, a modular package
+structure at C1 absorbed four subsequent checkpoints without rework and finished 12 points ahead of
+the runner-up.</p>
+
+<div class="callout callout--intuition">
+  <span class="callout__label">The takeaway</span>
+  <p>Identical scores at checkpoint one, radically different outcomes by checkpoint five. That is
+  the gap between what pass-rate benchmarks measure and what determines whether software survives
+  contact with changing requirements.</p>
+</div>
+  </section>
+
+  <section id="versus-humans">
+    <h2><span class="sec-num">06</span>Result 3: human repositories do not do this</h2>
+
+<p>Rising numbers only mean something against a reference. The authors assembled a panel of
+<strong>48 maintained open-source Python repositories</strong>, grouped by GitHub stars, and for 20
+of them sampled up to 30 commits from the source-touching history — producing 568 temporal
+checkpoints of human code evolution.</p>
+
+<div class="table-scroll wide">
+<table class="numeric">
+  <thead><tr><th>Group</th><th>n</th><th>Violation %</th><th>Clone ratio</th><th>Verbosity</th><th>Erosion</th></tr></thead>
+  <tbody>
+    <tr><td>Niche (&lt; 1k stars)</td><td>8</td><td>0.17 ± 0.13</td><td>0.05 ± 0.02</td><td>0.18 ± 0.11</td><td>0.39 ± 0.30</td></tr>
+    <tr><td>Established (1k–10k)</td><td>12</td><td>0.10 ± 0.07</td><td>0.06 ± 0.03</td><td>0.13 ± 0.06</td><td>0.26 ± 0.13</td></tr>
+    <tr><td>Major (&gt; 10k)</td><td>28</td><td>0.10 ± 0.04</td><td>0.07 ± 0.04</td><td>0.14 ± 0.03</td><td>0.31 ± 0.12</td></tr>
+    <tr><td>Human panel (all)</td><td>48</td><td>0.11 ± 0.07</td><td>0.06 ± 0.03</td><td>0.15 ± 0.06</td><td>0.31 ± 0.17</td></tr>
+    <tr><td><strong>Agent checkpoints</strong></td><td>990</td><td><strong>0.32 ± 0.11</strong></td><td>0.08 ± 0.07</td><td><strong>0.33 ± 0.10</strong></td><td><strong>0.68 ± 0.20</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>Agent code is <strong>2.2× more verbose</strong> than the human panel and concentrates roughly
+twice the share of its complexity in high-complexity functions. Only one of the 48 repositories
+exceeds the agent mean for verbosity. For scale: scikit-learn (0.411) and scipy (0.457) sit at the
+top of the human erosion range and are still well below the agent average of 0.68.</p>
+
+<p>Note that the verbosity gap is driven almost entirely by the AST-grep violation component —
+0.32 for agents versus 0.11 for humans — rather than by clone ratio, where the two are close
+(0.08 versus 0.06). Agents write more wasteful constructions; they are not overwhelmingly more
+duplicative at snapshot level.</p>
+
+<figure class="wide">
+  <img src="../assets/images/slopcodebench/fig-p09-figure-4.webp" alt="Two charts across five progress bins. In both, a blue Agents line rises steadily while an orange Human Repos line stays roughly flat and far below it. Shaded bands show 95 percent confidence intervals." width="1134" height="381">
+  <figcaption><span class="figlabel">Figure 4</span>The single most important chart in the paper. It is not the vertical gap that matters — the panel is not a matched comparison, so the gap alone proves little — it is that one line climbs and the other does not. Human repositories absorb years of change without a trend; agent trajectories deteriorate across a handful of checkpoints.<span class="figsrc">Extracted from page 9 of the paper.</span></figcaption>
+</figure>
+
+<p>The direction of travel separates the two populations more cleanly than the absolute levels do.
+Only 67% of human repositories end more verbose than they started, with a median first-to-last growth
+of 25%, against 43% for agents. For erosion, 55% of human repositories rise, against 79% of agent
+trajectories. Maintained software does get worse sometimes — it just does so less often and by less.</p>
+
+<div class="callout callout--caveat">
+  <span class="callout__label">The authors' own caveat, and it is a real one</span>
+  <p>This is explicitly not a matched baseline. The repositories differ from the benchmark problems
+  in task, age, team size and development process — they have code review, issue trackers, refactoring
+  sprints and contributors who will be maintaining the thing next year. The comparison answers a
+  narrow question ("does the drift in agent trajectories resemble how maintained software evolves?")
+  and cannot answer the more interesting one ("would a human solving these 20 problems do better?").
+  Worth holding onto when the 2.2× figure gets quoted without it.</p>
+  <p>The authors did check one obvious confound: since the temporal panel spans 2005 to 2026, recent
+  commits might themselves be LLM-assisted. Pre-ChatGPT checkpoints have a median verbosity of 0.134
+  against 0.148 after, so the human baseline does not appear to be contaminated in a way that would
+  matter.</p>
+</div>
+  </section>
+
+  <section id="prompting">
+    <h2><span class="sec-num">07</span>Result 4: better prompts move the intercept, not the slope</h2>
+
+<p>The obvious response to all of this is that the agents were told to "implement a program that 100%
+solves the specification" and nothing else. Ask for good code and you might get it. The authors
+tested exactly that, with two alternative prompts:</p>
+
+<ul>
+  <li><strong>anti_slop</strong> — an explicit list of prohibitions: no god functions, no abnormal
+      defensive checks, no casts to dodge type checking, no single-use variables, no trivial
+      wrappers, no heavy nesting, no if/else ladders, no comment spam.</li>
+  <li><strong>plan_first</strong> — plan before coding, write the simple solution, make it correct,
+      then refactor for quality.</li>
+</ul>
+
+<p>The prompts work, in the narrow sense. <code>anti_slop</code> cut initial verbosity by 34.5% on
+GPT 5.4 and 33.2% on GPT 5.3 Codex, and lowered initial erosion on both. On GPT 5.4 it reduced
+verbosity in 19 of 20 problems and erosion in all 20.</p>
+
+<figure class="wide">
+  <img src="../assets/images/slopcodebench/fig-p10-figure-5.webp" alt="A grid of eight charts, two model rows by four metric columns: structural erosion, verbosity, isolated test pass rate, and dollars per checkpoint. In the erosion and verbosity columns the Anti-Slop and Plan-First lines start lower than Baseline but rise in parallel with it." width="1300" height="531">
+  <figcaption><span class="figlabel">Figure 5</span>The result that makes the paper's argument. In the two leftmost columns the quality-aware prompts start visibly lower — and then climb at the same angle as the baseline. Lower intercept, unchanged slope. The third column shows pass rates did not improve; the fourth shows cost went up.<span class="figsrc">Extracted from page 10 of the paper.</span></figcaption>
+</figure>
+
+<p>And then the degradation resumes at the same rate. The per-checkpoint erosion and verbosity slopes
+do not differ significantly between prompt strategies on either model. The lines in Figure 5 are
+displaced downward and otherwise parallel.</p>
+
+<p>Two further findings sharpen this into something uncomfortable:</p>
+
+<p><strong>Correctness does not improve.</strong> Paired Wilcoxon signed-rank tests on per-problem
+trajectory means find no significant difference in any pass-rate subtype on either model — isolated
+(p = 0.931 and 0.102), functionality (p = 0.795 and 0.088), error (p = 0.144 and 0.050) and
+regression (p = 0.609 and 0.309). Halving erosion and cutting verbosity by a third left every
+pass-rate measure statistically unchanged.</p>
+
+<p><strong>Clean code cost more.</strong> GPT 5.4 spent 47.9% more per run under <code>anti_slop</code>
+($450 against $304) and 29.2% more under <code>plan_first</code> ($393). On the
+<code>dynamic_buffer</code> problem, <code>anti_slop</code> spent $99 against a baseline $35 while
+its pass rate <em>fell</em> from 37.2% to 27.1%. GPT 5.3 Codex saw no cost increase but lost 3.4
+percentage points of isolated pass rate under <code>anti_slop</code> and 2.2 under
+<code>plan_first</code>.</p>
+
+<div class="callout callout--note">
+  <span class="callout__label">How to read this honestly</span>
+  <p>"No significant difference" across eight tests on two models is not proof that quality prompting
+  is useless — the sample is 20 problems per configuration, and two of the eight p-values (0.050 and
+  0.088) hint at effects a larger study might resolve. The defensible claim is narrower and still
+  interesting: the degradation <em>rate</em> was unmoved by prompting, and whatever the quality gains
+  bought, it was not measurable correctness.</p>
+</div>
+  </section>
+
+  <section id="why-it-matters">
+    <h2><span class="sec-num">08</span>Why this matters</h2>
+
+<p>The practical claim is that pass rates and code quality have come apart, and that we have been
+measuring only the first. An agent can post a respectable score on every checkpoint of a task while
+leaving behind a codebase that a person then has to live in. Test suites cannot see structural decay,
+so a benchmark built on test suites cannot either.</p>
+
+<p>There is a sharper version of this in the appendix that deserves more attention than it gets.
+In the erosion sensitivity analysis, the authors report that across all nine metric variants, the
+correlation between erosion and the <em>next</em> checkpoint's pass rate stays near zero — while the
+correlation with the next checkpoint's <em>cost</em> stays positive. Eroded code does not
+straightforwardly cause the agent to fail next time. It causes the agent to spend more.</p>
+
+<p>That is a more interesting finding than "quality is bad," and it cuts in an awkward direction. It
+means erosion is not a leading indicator of correctness that you could optimise pass rates by
+attacking. It behaves like what it is named after: technical debt. You keep paying interest, and the
+work still gets done, until at some point a person has to read it.</p>
+
+<p>For anyone building with these tools, the concrete implications are narrow but real:</p>
+
+<ul>
+  <li>A green test suite after an agent's edit tells you the feature works. It tells you nothing
+      about what the next feature will cost.</li>
+  <li>The first checkpoint matters disproportionately. Every trajectory where an agent pulled ahead
+      did so because of a structural decision made before there was any pressure to make it well.</li>
+  <li>Asking for clean code in the prompt improves the starting point and does not change the
+      trajectory. If you want structural discipline to hold across a project, prompting is not the
+      lever.</li>
+</ul>
+
+<p>The paper's closing position is that the open question is no longer whether degradation happens
+but whether it can be stopped rather than merely delayed — through training, or through tooling that
+enforces structure across checkpoints rather than within one. Both remain untested here.</p>
+  </section>
+
+  <section id="limitations">
+    <h2><span class="sec-num">09</span>Limitations and open questions</h2>
+
+<p>Some of these the authors state plainly; others are worth adding.</p>
+
+<p><strong>The metrics are proxies, and they are Python-shaped.</strong> Erosion is built on
+cyclomatic complexity, a 1976 measure with a long critical literature; verbosity rests on 137
+hand-written rules encoding a particular view of wasteful Python. The nine-variant sensitivity
+analysis shows the conclusions do not hinge on the exact threshold or size term, which is a real
+check — but it tests parameter robustness, not construct validity. Nobody has shown that a codebase
+scoring 0.68 on this erosion metric is harder for a human to maintain than one scoring 0.31.</p>
+
+<p><strong>Only Python was evaluated.</strong> The benchmark is language-agnostic by construction,
+which is one of its better design choices, but cost constraints meant only the Python track was run.
+Whether the same degradation appears in a strongly typed language with a compiler pushing back on
+sprawl is untested and genuinely uncertain.</p>
+
+<p><strong>The human panel is a reference, not a control.</strong> Covered above, and it is the
+limitation most likely to be dropped when this result gets summarised.</p>
+
+<p><strong>Everything is measured through one harness version per model.</strong> The authors report
+sensitivity across harness versions where multiple were available and find aggregate metrics vary by
+under five percentage points — but note that individual problems vary considerably more, which is
+consistent with their own thesis about compounding. A single trajectory is a noisy object.</p>
+
+<p><strong>Twenty problems is not many.</strong> With 20 problems per configuration, the
+prompt-intervention statistics in particular are working with limited power, and the paper is
+appropriately careful to describe those results as an absence of detected difference rather than
+proof of no effect.</p>
+
+<p><strong>Nothing here diagnoses the cause.</strong> The paper establishes the phenomenon
+convincingly. Whether agents degrade code because of training incentives, context limits, the
+absence of a refactoring step in the harness loop, or something about how they read existing code —
+none of that is answered, and the fix depends entirely on which it is.</p>
+
+<p><strong>The models are a moving target.</strong> This is a v1 preprint from March 2026 evaluating
+model and harness versions available at that time. The specific numbers are a snapshot; the design
+of the benchmark is the durable contribution.</p>
+  </section>
+
+  <section id="glossary">
+    <h2><span class="sec-num">10</span>Glossary</h2>
+
+<dl class="glossary">
+  <dt>Checkpoint</dt>
+  <dd>One step of a problem: a written specification plus a hidden test suite. The agent's input is
+      the specification and its own workspace from the previous checkpoint.</dd>
+
+  <dt>Trajectory</dt>
+  <dd>The full sequence of workspaces an agent produces for one problem, from the first checkpoint
+      to the last. The unit over which degradation is measured.</dd>
+
+  <dt>Cyclomatic complexity (CC)</dt>
+  <dd>A count of the independent paths through a function, introduced by McCabe in 1976. In practice
+      it counts branch points: each <code>if</code>, loop or boolean operator adds one. A function
+      with CC = 285 has an enormous number of distinct ways to execute.</dd>
+
+  <dt>SLOC</dt>
+  <dd>Source lines of code — lines excluding blanks and comments.</dd>
+
+  <dt>Complexity mass</dt>
+  <dd>This paper's per-function weight: CC × √SLOC. Used so that erosion reflects both how branched
+      a function is and, to a lesser degree, how large.</dd>
+
+  <dt>Structural erosion</dt>
+  <dd>The share of a codebase's total complexity mass held by functions with CC above 10. High
+      erosion means complexity is concentrated in a few large functions rather than distributed.</dd>
+
+  <dt>Verbosity</dt>
+  <dd>The fraction of lines that are either flagged by one of 137 wasteful-pattern rules or are
+      duplicates of other lines.</dd>
+
+  <dt>Strict / Isolated / Core</dt>
+  <dd>Three ways of scoring a checkpoint. Strict requires every test including regressions from
+      earlier checkpoints; Isolated drops the regression tests; Core counts only behaviour the
+      specification explicitly described.</dd>
+
+  <dt>Regression test</dt>
+  <dd>A test carried forward from an earlier checkpoint, so that breaking old behaviour to add new
+      behaviour is penalised.</dd>
+
+  <dt>Fail-to-pass tests</dt>
+  <dd>The convention used by SWE-bench and its successors, where the agent is shown the tests that
+      must go from failing to passing. SlopCodeBench deliberately withholds these, since they leak
+      information about the intended structure.</dd>
+
+  <dt>AST-grep</dt>
+  <dd>A tool for matching patterns against a program's abstract syntax tree — the structural
+      representation of code — rather than against its text. Used here to write the 137 rules that
+      detect wasteful constructions, and also the inspiration for the benchmark's
+      <code>code_search</code> problem.</dd>
+
+  <dt>Slop</dt>
+  <dd>Informal term for high-volume, low-quality generated output. Here: code that works and that
+      nobody wants to inherit.</dd>
+</dl>
+  </section>
+
+  <section id="sources">
+    <h2><span class="sec-num">11</span>Sources</h2>
+
+<ol class="biblio">
+  <li id="r1">Gabriel Orlanski, Devjeet Roy, Alexander Yun, Changho Shin, Alex Gu, Albert Ge, Dyah
+      Adila, Frederic Sala and Aws Albarghouthi. <em>SlopCodeBench: Benchmarking How Coding Agents
+      Degrade Over Long-Horizon Iterative Tasks</em>. arXiv preprint arXiv:2603.24755v1, March 2026.
+      University of Wisconsin–Madison, Washington State University and MIT.
+      <a href="https://arxiv.org/abs/2603.24755" target="_blank" rel="noopener">arxiv.org/abs/2603.24755</a></li>
+  <li id="r2">The benchmark, data and code, per the paper:
+      <a href="https://www.scbench.ai" target="_blank" rel="noopener">scbench.ai</a></li>
+  <li id="r3">Thomas J. McCabe. <em>A Complexity Measure</em>. IEEE Transactions on Software
+      Engineering, SE-2(4):308–320, 1976. The origin of cyclomatic complexity.</li>
+  <li id="r4">Carlos E. Jimenez, John Yang, Alexander Wettig, Shunyu Yao, Kexin Pei, Ofir Press and
+      Karthik Narasimhan. <em>SWE-bench: Can Language Models Resolve Real-World GitHub Issues?</em>
+      ICLR, 2024. The single-shot paradigm this paper is arguing against.</li>
+  <li id="r5">Ward Cunningham. <em>The WyCash Portfolio Management System</em>. OOPSLA, 1992. The
+      original statement of technical debt.</li>
+</ol>
+  </section>
+
+
+  <footer class="colophon">
+    <p>Explained and published in the AI Library on 01 August 2026.</p>
+    <p>This page is a plain-English explanation written from the source listed above — read the
+       original for the authors' own words, exact numbers and full method details.</p>
+    <p><a href="../index.html">← Back to the library</a></p>
+  </footer>
+
+</main>
+
+<script src="../assets/app.js"></script>
+
+</body>
+</html>
