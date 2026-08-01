@@ -1,0 +1,8 @@
+# Dependencies for the add-resource extractors.
+# PyPI is reachable from the Claude Code web environment even when the rest of
+# the web is not, so `pip install -r requirements.txt` works there.
+pymupdf>=1.24
+Pillow>=10.0
+requests>=2.31
+beautifulsoup4>=4.12
+trafilatura>=1.8

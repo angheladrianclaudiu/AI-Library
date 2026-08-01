@@ -1,0 +1,24 @@
+[
+  {
+    "slug": "slopcodebench",
+    "title": "SlopCodeBench: How Coding Agents Degrade Over Long-Horizon Tasks",
+    "type": "paper",
+    "authors": "Gabriel Orlanski, Devjeet Roy, Alexander Yun, Changho Shin, Alex Gu, Albert Ge, Dyah Adila, Frederic Sala, Aws Albarghouthi",
+    "venue": "arXiv preprint",
+    "year": 2026,
+    "tags": [
+      "benchmarks",
+      "coding-agents",
+      "code-quality",
+      "evaluation",
+      "long-horizon"
+    ],
+    "hook": "Agents were made to extend their own code across up to eight rounds of changing specifications. None finished a single problem, and what they left behind got measurably worse every round — while human repositories stayed flat.",
+    "read_minutes": 23,
+    "words": 5016,
+    "page": "pages/slopcodebench.html",
+    "source_url": "https://arxiv.org/abs/2603.24755",
+    "pdf": "assets/pdf/slopcodebench.pdf",
+    "added": "2026-08-01"
+  }
+]
