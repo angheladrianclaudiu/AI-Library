@@ -196,6 +196,77 @@ figures, all vector diagrams built from clipart icons, plus eight tables. 3.6 MB
 
 ---
 
+## Session 4 — reviewing the context engineering page (no new ingest)
+
+**Source:** the session 3 page itself, 8 sections and ~5,200 words, re-checked against
+`2507.13334.pdf` recovered from git history. No extraction ran. Two adversarial subagents
+were briefed independently — one on fidelity to the source, one on craft against the
+writing guide — and their reports reconciled against the PDF before anything was changed.
+
+**What the review found:**
+
+1. **The `tldr` field silently ate its own markup.** The "In short" block — the first thing
+   on the page — rendered `<strong>context engineering</strong>` and `<em>understanding</em>`
+   as visible text. `as_paragraphs()` passes an item through untouched only when it starts
+   with `<`; anything else is escaped and wrapped in `<p>`. The tldr entries were bare
+   sentences carrying inline tags, so they took the escaping path. **Wrap every tldr entry
+   in its own `<p>`.** Worth noting how this survived session 3: the defect is invisible in
+   the content JSON, invisible in a diff of the generated HTML unless you know to look, and
+   the checklist has no line for it.
+2. **Four factual slips, all of the same species: a source sentence compressed one step too
+   far.** The worst was "WebArena | Web tasks across 137 sites" — p.48 reads "WebArena *and
+   Mind2Web* … spanning 137 websites", a joint figure narrowed onto one benchmark, where it
+   is simply false. Also `c_instr` gaining "persona" (p.9 says "System instructions and
+   rules"), MCP described as standardising "agent-to-tool access" (p.42: "agent-environment
+   interactions"), and a component-vs-system-level comparison attributed to the survey that
+   §6.1.1 and §6.1.2 never draw. **A quoted number carries its scope with it; check what the
+   subject of the source's sentence actually was.**
+3. **A corrupted author name in the bibliography.** "Guangzhi Xiao" for Guangxuan Xiao. The
+   other ten entries verified exactly. A plausible-looking name is unfalsifiable by eye —
+   check every cited name against the source's own reference list, which for a survey is
+   right there.
+4. **The page counted tokens 19 times without ever saying what one is**, and carried
+   chain-of-thought through three results including 17.7% → 78.7% without defining it. Both
+   are so basic they read as already-defined. **The terms that go unglossed are not the
+   exotic ones — they are the ones so fundamental the writer stops seeing them.** The
+   glossary made this worse by looking complete: twelve entries, ten of which restated a
+   definition the prose had already given, while token and chain-of-thought had none.
+
+**What held up.** Every deliberate critical judgement survived independent checking: the
+comprehension–generation asymmetry really is never quantified (§7.1.2 leaves the cause open
+between architecture, training and computational limits); the Gödel quotation on p.24 is
+verbatim, and the paper pins *statelessness* on incompleteness too, so the page understated
+it; and Figure 2's axis really does read 2020, 2021, 2023, 2024, 2025, 2025.07. All four
+equations, the six components, the 15-author list, the abstract blockquote and roughly
+twenty quoted numbers checked out. **The page was accurate; it was the compressions and the
+undefined basics that failed.**
+
+**On running adversaries.** Briefing both agents to prove a thesis rather than "review this"
+produced specific, quotable findings — but both over-reported, and one finding had to be
+rejected outright: the fidelity agent read §6.3.2's "approximately 20% improvement" and
+called the page's "20 percentage points" a unit error, missing §4.2.2 (p.18), which says
+"20% **absolute** performance improvement" — which is percentage points. **A subagent quoting
+one passage has not shown the paper says it only once.** Verify each finding at its primary
+occurrence before acting. The craft agent's recommendation to delete the redundant glossary
+entries was also rejected: a glossary is a random-access lookup, so restating a body
+definition is the point.
+
+**Tooling notes for this environment:**
+
+- **The content JSON was gone and had to be reconstructed from the generated HTML** —
+  `.gitignore` matches `*.content.json` repo-wide. Parsing `<section>` bodies back out and
+  rebuilding to a byte-identical page is what made editing safe, and it is pure luck that the
+  round-trip was exact. Logged in TASKS.md; this is the review's most important finding about
+  the machine rather than the page.
+- **Recovering a deleted 3.6 MB source from history costs nothing in context:**
+  `git show <ref>:<path> > inbox/…` after `git fetch --unshallow`. Session 3's route in still
+  works as a route back.
+- **Rebuild-and-diff is the reconstruction test.** Before changing a word, rebuild from the
+  reconstructed JSON and diff against the committed page. Anything other than an empty diff
+  means the JSON is wrong, not the page.
+
+---
+
 ## Session template
 
 ```

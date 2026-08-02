@@ -93,6 +93,21 @@ source that caused it.
 
 ## Process
 
+- [ ] **A published page cannot be regenerated from a fresh clone.** `.gitignore:9`
+      matches `*.content.json` repo-wide, so the content JSON — the only editable
+      representation of a page — never enters history. `pages/*.html` is generated and
+      must not be hand-edited, so the moment the ingest session's `inbox/` is gone, a
+      published page can only be corrected by reconstructing its JSON out of the HTML
+      it produced. That is exactly what reviewing the context engineering survey cost:
+      a parse of the generated page back into sections, validated by rebuilding and
+      diffing to byte equality before any edit was safe. It round-tripped, but nothing
+      guarantees that — a future template change would break the parse, and the
+      reconstruction silently loses any field the template does not emit.
+      Fix: commit the content JSON. Either narrow the ignore rule to `inbox/` and store
+      them in a `content/` directory, or have `make_page.py` write a copy next to the
+      page it builds. The source PDF still stays out of history; only the JSON needs to
+      survive.
+
 - [ ] **Tag vocabulary needs curating.** `data/tags.json` grows monotonically and nothing
       ever merges near-duplicates. Revisit once there are ~20 resources.
 - [ ] **Batch ingest.** One resource per run is right for quality, but a queue mode for
