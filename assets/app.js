@@ -128,8 +128,9 @@
   }
 
   function cardHTML(it) {
-    var type = it.type === "article" ? "article" : "paper";
-    var typeLabel = type === "article" ? "Article" : "Paper";
+    var TYPES = { paper: "Paper", article: "Article", guide: "Guide" };
+    var type = TYPES[it.type] ? it.type : "paper";
+    var typeLabel = TYPES[type];
     var byline = [it.authors, it.venue, it.year].filter(Boolean).join(" · ");
     var tags = (it.tags || []).map(function (t) {
       return '<li class="tag">' + esc(t) + "</li>";

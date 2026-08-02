@@ -12,7 +12,7 @@ Content JSON shape
 {
   "slug": "attention-is-all-you-need",
   "title": "Attention Is All You Need",
-  "type": "paper",                       # "paper" | "article"
+  "type": "paper",                       # "paper" | "article" | "guide"
   "authors": "Vaswani, Shazeer, Parmar, …",
   "venue": "NeurIPS",                    # or the site name for an article
   "year": 2017,
@@ -21,6 +21,7 @@ Content JSON shape
   "tldr": ["<p>…</p>", "<p>…</p>"],      # HTML paragraphs, or plain strings
   "source_url": "https://arxiv.org/abs/1706.03762",
   "pdf": "assets/pdf/attention-is-all-you-need.pdf",   # optional, only if < 1MB
+  "scripts": ["assets/fieldguide.js"],   # optional, local paths only
   "sections": [
     {"id": "the-problem", "title": "The problem", "html": "<p>…</p>"}
   ]
@@ -56,6 +57,24 @@ from common import (  # noqa: E402
 
 TEMPLATE = SKILL / "assets" / "page-template.html"
 REQUIRED = ("slug", "title", "sections", "hook")
+
+# What a resource can be. "guide" is for something written for this library
+# rather than explained from an outside source, so it has no original to link.
+TYPE_LABELS = {"paper": "Paper", "article": "Article", "guide": "Guide"}
+
+# The colophon's standing promise — true for anything explained from a source,
+# and wrong for a guide, which has no original to send the reader back to.
+COLOPHON_NOTES = {
+    "default": (
+        "This page is a plain-English explanation written from the source listed above — "
+        "read the original for the authors' own words, exact numbers and full method details."
+    ),
+    "guide": (
+        "This page was written for this library rather than explained from an outside "
+        "source. Its claims are cited where they are load-bearing; everything else is "
+        "exposition."
+    ),
+}
 
 
 def esc(value) -> str:
@@ -98,11 +117,19 @@ def build_sections(sections: list[dict]) -> str:
     return "\n".join(parts)
 
 
+SOURCE_LABELS = {
+    "paper": "Original paper",
+    "article": "Original article",
+    "guide": "Source",
+}
+
+
 def build_source_links(content: dict) -> str:
+    rtype = content.get("type", "paper")
     links = []
     url = content.get("source_url")
     if url:
-        label = "Original paper" if content.get("type", "paper") == "paper" else "Original article"
+        label = SOURCE_LABELS.get(rtype, "Source")
         links.append(
             f'<a class="srclink" href="{esc(url)}" target="_blank" rel="noopener">↗ {label}</a>'
         )
@@ -117,7 +144,13 @@ def build_source_links(content: dict) -> str:
             f'↗ {esc(extra["label"])}</a>'
         )
     if not links:
-        links.append('<span class="srclink">No public source link</span>')
+        # A guide is original to this library, so there is no missing original.
+        note = (
+            "Written for this library"
+            if rtype == "guide"
+            else "No public source link"
+        )
+        links.append(f'<span class="srclink">{note}</span>')
     return "\n      ".join(links)
 
 
@@ -172,8 +205,8 @@ def main() -> int:
     minutes = content.get("read_minutes") or read_minutes(words)
 
     rtype = content.get("type", "paper")
-    if rtype not in ("paper", "article"):
-        sys.exit('type must be "paper" or "article"')
+    if rtype not in TYPE_LABELS:
+        sys.exit(f"type must be one of {', '.join(sorted(TYPE_LABELS))}")
 
     authors_block = ""
     if content.get("authors"):
@@ -188,12 +221,22 @@ def main() -> int:
 
     added = content.get("added") or date.today().isoformat()
 
+    # Page-scoped scripts, so an interactive resource can ship its own local
+    # JS without anyone hand-editing the generated HTML. Local paths only —
+    # the site's one-external-dependency rule is the Google Fonts link.
+    scripts = []
+    for src in content.get("scripts", []):
+        if src.startswith(("http://", "https://", "//")):
+            sys.exit(f"scripts must be local to this repo, got: {src}")
+        href = src if src.startswith("../") else f"../{src.lstrip('/')}"
+        scripts.append(f'<script src="{esc(href)}"></script>')
+
     page = TEMPLATE.read_text(encoding="utf-8")
     replacements = {
         "{{TITLE}}": esc(content["title"]),
         "{{DESCRIPTION}}": esc(content["hook"]),
         "{{TYPE}}": rtype,
-        "{{TYPE_LABEL}}": "Paper" if rtype == "paper" else "Article",
+        "{{TYPE_LABEL}}": TYPE_LABELS[rtype],
         "{{AUTHORS_BLOCK}}": authors_block,
         "{{META}}": build_meta_line(content, minutes),
         "{{SOURCE_LINKS}}": build_source_links(content),
@@ -201,6 +244,11 @@ def main() -> int:
         "{{TOC}}": build_toc(sections),
         "{{SECTIONS}}": build_sections(sections),
         "{{ADDED}}": date.fromisoformat(added).strftime("%d %B %Y"),
+        "{{EXTRA_SCRIPTS}}": "\n".join(scripts),
+        "{{COLOPHON_NOTE}}": as_paragraphs(
+            content.get("colophon_note")
+            or COLOPHON_NOTES.get(rtype, COLOPHON_NOTES["default"])
+        ),
     }
     for needle, value in replacements.items():
         page = page.replace(needle, value)

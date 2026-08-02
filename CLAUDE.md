@@ -4,6 +4,11 @@ A static, GitHub Pages-hosted library of AI research papers and long-form articl
 Each resource gets one page: a plain-English explanation written from the source,
 with the source's own figures extracted and captioned. `index.html` is the menu.
 
+A third `type`, `guide`, is for material written *for* this library rather than
+explained from an outside source — so it has no original to link and no figures to
+extract. A guide may carry interactive widgets via the content JSON's `scripts`
+field; see `assets/fieldguide.js` and the writing guide's "Interactive instruments".
+
 **The site is the product; `.claude/skills/add-resource/` is the machine that grows it.**
 Changes to the machine should be justified by something that went wrong building a page.
 

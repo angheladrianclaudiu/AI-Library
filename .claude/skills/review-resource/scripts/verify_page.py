@@ -127,8 +127,16 @@ def main() -> int:
                         ".map(i => i.getAttribute('src'))"
                     )
                     check(not broken, f"images failed to load: {broken}")
+                    # A paper page with no images means the figure pass silently
+                    # produced nothing. A guide written for this library can
+                    # legitimately carry none, so only demand images from a page
+                    # that actually declares figures.
+                    figures = page.evaluate("document.querySelectorAll('figure').length")
                     count = page.evaluate("document.images.length")
-                    check(count > 0, "the page has no images at all")
+                    check(
+                        count > 0 or figures == 0,
+                        f"the page declares {figures} figures but has no images",
+                    )
 
                     dead_toc = page.evaluate(
                         "[...document.querySelectorAll('.toc a')]"
