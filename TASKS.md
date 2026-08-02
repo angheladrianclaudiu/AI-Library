@@ -33,6 +33,21 @@ source that caused it.
       before using it. A cheap machine check would catch most bad crops: run text
       extraction over the crop region and warn when it contains more than ~200 characters
       of prose, which almost always means body text leaked in.
+- [ ] **Icon-built diagrams flood the candidate list.** A figure drawn as vector art decorated
+      with clipart icons emits every icon as a separate embedded candidate: the context
+      engineering survey produced 40 junk candidates against 7 real figures, all of them
+      256 × 256 or 768 × 512 and so comfortably past `MIN_SIDE`/`MIN_AREA`. Size filters cannot
+      fix this — the discriminator is position. Fix: drop an embedded image whose rect falls
+      inside a region the caption pass already rendered, which the extractor knows at that point.
+- [ ] **Reported word count includes the bibliography.** For the context engineering survey this
+      meant 72,963 reported against ~28,000 words of actual content, the other 58% being a
+      1,400-entry reference list. Any depth-rubric decision taken from the headline number is
+      wrong for survey-shaped sources. Fix: detect the `References` heading and report content
+      and bibliography word counts separately.
+- [ ] **`guess_authors()` can return a confidently wrong value.** Recorded in TASKS as returning
+      nothing on stacked author blocks; on a 15-author paper it returned just the first author.
+      A truthiness check passes it. Whatever the fix, it should signal low confidence rather
+      than silently emit one name.
 - [ ] **Dedupe heuristic is crude.** `drop_redundant_regions()` compares a region against
       embedded image rects by area overlap at a fixed 0.85 threshold. Fine so far; will
       misfire on a figure that is a raster with vector annotations drawn over it.

@@ -120,6 +120,82 @@ code this session had "passed".
 
 ---
 
+## Session 3 — A Survey of Context Engineering for LLMs (arXiv:2507.13334)
+
+**Source:** 166 pages, single-column, 72,963 words — by far the largest source so far. Seven
+figures, all vector diagrams built from clipart icons, plus eight tables. 3.6 MB.
+
+**What worked first time:**
+
+- **Title, arXiv ID and `source_url`.** Third paper in a row where the arXiv ID was recovered
+  from the paper's own text. This path is reliable; keep trusting it for preprints.
+- **All seven region crops were clean on first inspection.** No slicing, no absorbed body
+  text. The constants tuned in session 2 (`TEXT_REACH`, `MAX_TEXT_GROWTH`, `MAX_LABEL_CHARS`)
+  held on a completely different figure style — icon-heavy TikZ rather than matplotlib. First
+  time the crop logic has needed no intervention at all.
+- **`drop_redundant_regions()` correctly kept all seven.** Pages 13, 31, 38 and 42 each carried
+  a dozen embedded icons *inside* the figure region, and the 0.85 area-overlap threshold did not
+  fire. The crude heuristic flagged in TASKS.md survived a case that could plausibly have broken it.
+
+**What broke:**
+
+1. **The embedded pass produced 40 candidates and every one was junk.** This paper's figures are
+   vector diagrams decorated with clipart icons, and each icon is an embedded raster of
+   256 × 256 or 768 × 512. Those clear `MIN_SIDE` (120) and `MIN_AREA` (25,000) comfortably, so
+   all 40 were emitted as figure candidates with the caption of whatever figure they sat inside.
+   Ratio of noise to signal was 40:7. **New failure mode**, distinct from session 1's single
+   stray logo: there the icons polluted a *crop*, here they pollute the *candidate list*.
+   Logged in TASKS.md — the fix is probably to drop embedded images whose rect falls inside an
+   already-rendered figure region, which is information the extractor already has.
+
+2. **`guess_authors()` returned `"Lingrui Mei"` — the first of fifteen.** Session 2 recorded this
+   function returning an empty string on a stacked author block; here it returned a *plausible
+   but wrong* value, which is worse, because an empty field is obviously broken and a
+   single-author string is not. Anything that only checks for truthiness will pass it.
+   **Check the author field by eye, not by `if authors:`.**
+
+3. **The extractor's word count is misleading for a survey.** It reported 72,963 words, which
+   implies something around a 5½-hour read. In fact pages 1–59 hold ~28,000 words of content and
+   pages 59–166 are a 1,400-entry bibliography — 58% of the reported words are references. Any
+   depth decision made from the headline number would have been badly wrong. Logged in TASKS.md.
+
+**Non-extraction findings:**
+
+- **The figure contradicted itself again, in a new way.** Figure 2's timeline axis runs
+  2020, 2021, 2023, 2024, 2025, 2025.07 — **2022 is missing**, though branches clearly pass
+  through it. As in session 2, the caption does not mention it. Two for two on figures that do
+  not survive being read against the prose; treat this as the default expectation, not bad luck.
+- **The paper's own reasoning has a soft spot worth flagging on the page.** It attributes LLMs'
+  weak self-validation to "fundamental limits identified in Gödel's incompleteness theorems",
+  which is a category error — incompleteness is about provability in formal arithmetic systems,
+  not about whether a network can check its own output. Flagged in a caveat.
+- **A survey needs claims separated from evidence more aggressively than a methods paper.**
+  Every number in this source is quoted from another paper under that paper's conditions, and
+  the headline finding (the comprehension–generation asymmetry) is an impression formed from
+  reading rather than anything measured. Both facts needed saying explicitly, twice, or the page
+  would have read as though the survey had established them.
+- **Forcing the standard methods-paper skeleton onto a survey worked better than expected.**
+  `results` became "what the synthesis establishes, and how firmly", which turned out to be the
+  most useful section on the page precisely because it forced the claim/evidence split. The
+  writing guide's own advice to adapt the skeleton was not needed here.
+
+**Tooling notes for this environment:**
+
+- **arXiv is blocked** — `curl` on both the PDF and the HTML returns `CONNECT tunnel failed, 403`,
+  and `WebFetch` on the abs page returns 403. The route that worked was the user pushing both
+  sources into the repo and this session pulling them with `git show <ref>:<path> > inbox/…`,
+  which moves a 3.6 MB blob without it ever entering the model's context.
+- **`WebFetch` reaches `raw.githubusercontent.com`** even though the open web is blocked. Useful
+  for reading metadata out of a large file already in the repo without loading it.
+- **A blocked-request console message does not contain the URL.** Filtering console text for
+  "fonts.googleapis" therefore never matches; listen to the `requestfailed` event and inspect
+  `request.url` instead. Cost a debugging round.
+- **A table inside `.table-scroll` is *supposed* to be wider than the viewport.** An assertion
+  that no element exceeds the phone width will fail on a correct page. Assert instead that the
+  *scroll container* fits and that `scrollWidth > clientWidth`. Nearly "fixed" a non-bug.
+
+---
+
 ## Session template
 
 ```
