@@ -8,5 +8,6 @@
   "long-horizon",
   "memory",
   "rag",
-  "survey"
+  "survey",
+  "transformers"
 ]

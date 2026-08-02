@@ -1,0 +1,1181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Machinery of Language Models — AI Library</title>
+<meta name="description" content="Twelve chapters from a character of text to a production agent, with the arithmetic exposed and eight working instruments in the page — the tokenizer, the attention heatmap, the samplers and the cache calculators all compute for real as you drag them.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#129504;</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem("ail-theme");
+      if (t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t);
+    } catch (e) {}
+  })();
+</script>
+</head>
+<body>
+
+<div id="progress"></div>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="topbar">
+  <a class="topbar__home" href="../index.html">
+    <span class="topbar__mark" aria-hidden="true">AI</span>
+    <span>AI Library</span>
+  </a>
+  <span class="topbar__crumb">The Machinery of Language Models</span>
+  <span class="topbar__spacer"></span>
+  <button class="theme-toggle" type="button" aria-label="Toggle dark and light theme">
+    <span class="icon-light" aria-hidden="true">☾</span>
+    <span class="icon-dark" aria-hidden="true">☀</span>
+  </button>
+</header>
+
+<main id="main" class="doc">
+
+  <div class="hero">
+    <p class="hero__kicker">
+      <span class="badge badge--guide">Guide</span>
+    </p>
+    <h1>The Machinery of Language Models</h1>
+    <p class="hero__authors">Sarmisoft <span class="hero__venue">· AI Library · 2026</span></p>
+    <p class="hero__meta">31 min read<span class="hero__tags">transformers · context-engineering · rag · agents · evaluation</span></p>
+    <p class="srclinks"><span class="srclink">Written for this library</span></p>
+  </div>
+
+  <div class="tldr">
+    <h2>In short</h2>
+    <p>A field guide to how large language models actually work, built around instruments rather than diagrams. The tokenizer, the attention heatmap, the mixture-of-experts router, the sampler, the KV-cache and LoRA calculators, the context budget and the retrieval ranker all compute in the page, from the same formulas the surrounding prose describes.</p>
+    <p>Chapters 01–05 build the mechanism: tokens, attention and position, the stack and sparsity, sampling, and what long context costs. Chapters 06–07 cover where frontier models diverge and how weights are trained and adapted. Chapters 08–12 are the practice — prompting, context engineering, retrieval, tool loops and evals.</p>
+    <p>It is deliberately short on model names and prices, which go stale within months, and long on the axes that do not. Load-bearing numbers are cited; everything else is exposition and says so.</p>
+  </div>
+
+  <details class="toc" open>
+    <summary>Contents</summary>
+    <ol>
+      <li><a href="#tokens">Tokens and vectors</a></li>
+      <li><a href="#attention">Attention, and how position gets in</a></li>
+      <li><a href="#the-stack">The stack, and mixture of experts</a></li>
+      <li><a href="#sampling">Sampling: from logits to a word</a></li>
+      <li><a href="#kv-cache">The KV cache, and what context costs</a></li>
+      <li><a href="#frontier">Where frontier models diverge</a></li>
+      <li><a href="#weights">Weights, training and tuning</a></li>
+      <li><a href="#prompting">Prompt engineering</a></li>
+      <li><a href="#context-engineering">Context engineering</a></li>
+      <li><a href="#retrieval">Retrieval</a></li>
+      <li><a href="#tool-loops">Tool loops and agents</a></li>
+      <li><a href="#evals">Evals</a></li>
+      <li><a href="#glossary">Glossary</a></li>
+      <li><a href="#sources">Sources</a></li>
+    </ol>
+  </details>
+
+  <section id="tokens">
+    <h2><span class="sec-num">01</span>Tokens and vectors</h2>
+<p class="lead">Before anything else happens, your text is chopped into <em>tokens</em> &mdash;
+chunks of a few characters &mdash; and each chunk is swapped for its row number in a fixed
+vocabulary. A model never sees your words. It sees a list of integers, and everything downstream
+is arithmetic on those integers.</p>
+
+<p>The chopping is learned, not rule-based. Byte-pair encoding starts from raw bytes and
+repeatedly merges the most frequent adjacent pair until it has a vocabulary of the target size,
+typically 50,000 to 200,000 entries<a href="#r1" class="cit">1</a>. Frequent words survive as one
+token. Rare words shatter into pieces. This is why models are strangely bad at counting the
+letters in a word &mdash; they never saw the letters &mdash; and why the same sentence costs
+noticeably more in Romanian or Japanese than in English.</p>
+
+
+<div class="fg" id="fg-tok">
+  <div class="fg__label"><span>Live tokenizer</span><em>approximation of BPE</em></div>
+  <label class="fg__fieldlabel" for="fg-tok-in">Text to tokenize</label>
+  <textarea id="fg-tok-in" rows="3">Context engineering is the delicate art of budgeting attention.</textarea>
+  <div class="fg__tokens" id="fg-tok-out"></div>
+  <p class="fg__note">Every chip is one token; the small number under it is the row it would
+     index into. Click one to see its vector below.</p>
+  <div class="fg__readout">
+    <div><b>characters</b><span id="fg-tok-chars">&mdash;</span></div>
+    <div><b>tokens</b><span id="fg-tok-count">&mdash;</span></div>
+    <div><b>ratio</b><span id="fg-tok-ratio">&mdash;</span></div>
+  </div>
+</div>
+
+
+<h3>From integer to vector</h3>
+
+<p>The integer is only an address. It indexes into an <em>embedding matrix</em> &mdash; one
+learned vector per vocabulary entry &mdash; and that vector is what actually flows through the
+network. Meaning lives in direction and distance, not in the ID: two tokens with adjacent row
+numbers have nothing in common, while two tokens used in similar contexts end up pointing in
+similar directions.</p>
+
+
+<div class="fg">
+  <div class="fg__label"><span id="fg-tok-emblabel">Embedding</span><em>8 of several thousand dimensions</em></div>
+  <div id="fg-tok-emb" style="display:flex;gap:3px"></div>
+</div>
+
+
+<div class="callout callout--note">
+  <span class="callout__label">What's real here</span>
+  <p>The splitting behaviour mirrors a real tokenizer, but the merge table is a stand-in built
+  from a word list rather than learned from a corpus. The vectors are deterministic
+  pseudo-random: a real embedding row is trained, and holds thousands of numbers rather than
+  eight.</p>
+</div>
+  </section>
+
+  <section id="attention">
+    <h2><span class="sec-num">02</span>Attention, and how position gets in</h2>
+<p class="lead">Every token asks a question, every token advertises an answer, and the strength
+of the match decides how much each one contributes to the next representation. Attention is a
+weighted average, and the weights are earned.</p>
+
+<p>Each token's vector is projected three ways: a <strong>query</strong> (what am I looking for),
+a <strong>key</strong> (what do I offer), and a <strong>value</strong> (what I will hand over if
+chosen). Take the dot product of every query with every key, divide by the square root of the
+head dimension, softmax each row into probabilities, then mix the values with those
+probabilities<a href="#r2" class="cit">2</a>.</p>
+
+<div class="eq">
+  <div class="eq__math">Attention(Q, K, V) = softmax( Q&middot;K&#7488; / &radic;d ) &middot; V</div>
+  <div class="eq__read"><strong>In words</strong>Compare every query against every key with a dot
+  product, which is large when two vectors point the same way. Divide by &radic;d, the square root
+  of the head dimension, so the scores stay in a range softmax can work with. Turn each row of
+  scores into weights that sum to one. Then take that weighted average of the value vectors.</div>
+</div>
+
+<p>The division by &radic;d looks like a footnote and is not. Dot products of long vectors grow
+with dimension; without the scale, softmax saturates, one weight goes to nearly 1.0, and
+gradients die. Turn it off in the panel below and watch the matrix go binary.</p>
+
+<h3>Attention is order-blind, and has to be fixed</h3>
+
+<p>Notice what the formula does <em>not</em> contain: any notion of where a token sits. A dot
+product between a query and a key is identical whether the two tokens are adjacent or a thousand
+apart. Shuffle the input and every attention weight simply follows its token to the new position.
+On its own, this mechanism sees a bag, not a sentence.</p>
+
+<p>So position has to be injected deliberately. The original transformer added fixed sinusoidal
+vectors to the embeddings &mdash; a different frequency per dimension, so every position gets a
+distinct signature and relative offsets stay expressible<a href="#r2" class="cit">2</a>. Learned
+absolute position embeddings were the next common choice. Both share a weakness: they do not
+extrapolate past the lengths seen in training.</p>
+
+<p>Rotary position embedding is what essentially all current models use instead. Rather than
+adding anything to the vector, RoPE <em>rotates</em> the query and key by an angle proportional to
+their absolute position, within each two-dimensional slice of the head. Because the dot product
+of two rotated vectors depends only on the difference of their angles, the attention score becomes
+a function of <em>relative</em> distance without anyone storing a relative-position
+table<a href="#r3" class="cit">3</a>. That property is what makes context extension work:
+stretching or interpolating the rotation frequencies lets a model trained at one length operate
+beyond it, which is how a claim like &ldquo;256K native, 1M by
+extrapolation&rdquo;<a href="#r6" class="cit">6</a> is built.</p>
+
+
+<div class="fg" id="fg-attn">
+  <div class="fg__label"><span>Attention heatmap</span><em id="fg-attn-meta">head 0</em></div>
+  <label class="fg__fieldlabel" for="fg-attn-in">Sentence</label>
+  <textarea id="fg-attn-in" rows="2">The board approved the plan because it was cheap</textarea>
+  <div class="fg__row" style="margin:.85rem 0">
+    <button type="button" class="fg__btn" data-fg-head="0" aria-pressed="true">Head 0</button>
+    <button type="button" class="fg__btn" data-fg-head="1" aria-pressed="false">Head 1</button>
+    <button type="button" class="fg__btn" data-fg-head="2" aria-pressed="false">Head 2</button>
+    <button type="button" class="fg__btn" data-fg-head="3" aria-pressed="false">Head 3</button>
+    <button type="button" class="fg__btn" id="fg-attn-causal" aria-pressed="true">Causal mask</button>
+    <button type="button" class="fg__btn" id="fg-attn-scaled" aria-pressed="true">&divide;&radic;d</button>
+    <button type="button" class="fg__btn" id="fg-attn-pos" aria-pressed="true">Position signal</button>
+  </div>
+  <div class="fg__ctl">
+    <label for="fg-attn-temp"><span>softmax temperature</span><b id="fg-attn-tempv">1.00</b></label>
+    <input type="range" id="fg-attn-temp" min="0.1" max="4" step="0.05" value="1">
+  </div>
+  <div id="fg-attn-grid"></div>
+  <p class="fg__note">Row = the token doing the looking. Column = the token being looked at.
+     Every row sums to 1.</p>
+  <div class="fg__readout">
+    <div><b>head</b><span id="fg-attn-head">#0</span></div>
+    <div><b>softmax T</b><span id="fg-attn-t">1.00</span></div>
+    <div><b>last-row entropy</b><span id="fg-attn-h">&mdash;</span></div>
+    <div><b>position signal</b><span id="fg-attn-posv">on</span></div>
+  </div>
+</div>
+
+
+<h3>Why several heads</h3>
+
+<p>One head can only express one notion of relevance. Real blocks run dozens in parallel on slices
+of the vector, then concatenate the results. Switch heads above: same sentence, same arithmetic,
+different random projections, a completely different pattern. In a trained model those differences
+are not random &mdash; heads specialise into things like tracking the subject of a clause,
+matching brackets, or copying a rare name from earlier in the prompt.</p>
+
+<div class="callout callout--note">
+  <span class="callout__label">What's real here</span>
+  <p>The arithmetic is the genuine mechanism: projections, dot products, &radic;d scaling, causal
+  masking, row-wise softmax and additive sinusoidal position. The weight matrices are seeded
+  random rather than trained, so the patterns are structurally honest but semantically
+  meaningless. The demo uses the older additive scheme rather than RoPE for one reason: additive
+  position can be switched off in a single line, and being able to switch it off is the whole
+  point of the toggle.</p>
+</div>
+  </section>
+
+  <section id="the-stack">
+    <h2><span class="sec-num">03</span>The stack, and mixture of experts</h2>
+<p class="lead">A transformer is embarrassingly repetitive: one block, stacked dozens of times,
+each repetition nudging every token's vector a little further toward a representation from which
+the next word is obvious.</p>
+
+<p>Inside a block: normalise, run multi-head attention, add the result back to the input;
+normalise again, run a feed-forward network, add that back too. Those add-backs are
+<em>residual connections</em>, and they are the reason depth works at all &mdash; each block
+writes an edit onto a shared stream rather than replacing it, so gradients have a clean path back
+to layer one<a href="#r2" class="cit">2</a>.</p>
+
+<p>Attention moves information <em>between</em> tokens. The feed-forward network processes each
+token alone and holds most of the parameters, behaving like a large key-value store of learned
+patterns. Which is exactly why it became the target for sparsity.</p>
+
+<h3>Mixture of experts</h3>
+
+<p>Split that one fat feed-forward network into many smaller ones and put a small router in front
+that picks a handful per token. Capacity gets decoupled from cost: you buy more knowledge with
+memory instead of with arithmetic. DeepSeek-V3 is a clear published example &mdash; 671 billion
+total parameters with 37 billion activated per token, using 256 routed experts plus one always-on
+shared expert, of which eight routed experts fire for each
+token<a href="#r4" class="cit">4</a>.</p>
+
+
+<div class="fg" id="fg-moe">
+  <div class="fg__label"><span>Router</span><em id="fg-moe-tok">&mdash;</em></div>
+  <div class="fg__row" id="fg-moe-toks" style="margin-bottom:.9rem"></div>
+  <div class="fg__egrid" id="fg-moe-grid" role="img" aria-label="Expert activation grid"></div>
+  <div class="fg__cols" style="margin-top:1.15rem">
+    <div>
+      <div class="fg__ctl">
+        <label for="fg-moe-experts"><span>experts per layer</span><b id="fg-moe-expertsv">128</b></label>
+        <input type="range" id="fg-moe-experts" min="8" max="256" step="8" value="128">
+      </div>
+      <div class="fg__ctl">
+        <label for="fg-moe-topk"><span>experts routed per token (top-k)</span><b id="fg-moe-topkv">8</b></label>
+        <input type="range" id="fg-moe-topk" min="1" max="32" step="1" value="8">
+      </div>
+      <div class="fg__ctl">
+        <label for="fg-moe-total"><span>total parameters</span><b id="fg-moe-totalv">600B</b></label>
+        <input type="range" id="fg-moe-total" min="50" max="2000" step="50" value="600">
+      </div>
+    </div>
+    <div>
+      <div class="fg__barrow"><span>Total</span>
+        <div class="fg__bar" style="width:100%;background:var(--rule-strong)"></div>
+        <em id="fg-moe-btot">&mdash;</em></div>
+      <div class="fg__barrow"><span>Active / token</span>
+        <div class="fg__bar" id="fg-moe-bact"></div>
+        <em id="fg-moe-bactv">&mdash;</em></div>
+    </div>
+  </div>
+  <p class="fg__note" id="fg-moe-note"></p>
+  <div class="fg__readout">
+    <div><b>experts</b><span id="fg-moe-e">128</span></div>
+    <div><b>top-k</b><span id="fg-moe-k">8</span></div>
+    <div><b>routed sparsity</b><span id="fg-moe-s">&mdash;</span></div>
+    <div><b>params active</b><span id="fg-moe-a">&mdash;</span></div>
+  </div>
+</div>
+
+
+<p>The direction of travel is visible in published figures. Mixtral 8x22B, released in April 2024,
+activated 39B of 141B parameters &mdash; about 28%<a href="#r5" class="cit">5</a>. DeepSeek-V3,
+eight months later, activated 37B of 671B, about 5.5%<a href="#r4" class="cit">4</a>.
+Qwen3-Coder-480B-A35B, in July 2025, activated 35B of 480B, about
+7.3%<a href="#r6" class="cit">6</a>. Total capacity grew several-fold while the compute spent per
+token stayed roughly flat.</p>
+
+<div class="callout callout--caveat">
+  <span class="callout__label">The catch</span>
+  <p>Routing is a discrete choice inside a differentiable system, which makes mixture-of-experts
+  training unstable in specific ways. Experts collapse toward popularity, so load balancing needs
+  deliberate handling &mdash; DeepSeek-V3 reports an auxiliary-loss-free strategy for exactly
+  this<a href="#r4" class="cit">4</a> &mdash; and serving requires spreading experts across
+  several GPUs, because no single card holds them all.</p>
+</div>
+  </section>
+
+  <section id="sampling">
+    <h2><span class="sec-num">04</span>Sampling: from logits to a word</h2>
+<p class="lead">The final layer produces one raw score &mdash; a <em>logit</em> &mdash; for every
+entry in the vocabulary. Softmax turns those into probabilities. Then a sampler chooses, and that
+choice is not part of the model at all.</p>
+
+<p>This split matters more than it sounds. Two &ldquo;different&rdquo; answers from the same model
+on the same prompt are usually the same distribution sampled twice. Determinism is a sampler
+setting, not a model property.</p>
+
+
+<div class="fg" id="fg-sample">
+  <div class="fg__label"><span>Sampler</span><em>the sentence so far: &ldquo;the room was &hellip;&rdquo;</em></div>
+  <div class="fg__cols">
+    <div>
+      <div class="fg__ctl">
+        <label for="fg-sample-t"><span>temperature</span><b id="fg-sample-t-v">0.80</b></label>
+        <input type="range" id="fg-sample-t" min="0.05" max="2" step="0.05" value="0.8">
+      </div>
+      <div class="fg__ctl">
+        <label for="fg-sample-k"><span>top-k</span><b id="fg-sample-k-v">12</b></label>
+        <input type="range" id="fg-sample-k" min="1" max="12" step="1" value="12">
+      </div>
+      <div class="fg__ctl">
+        <label for="fg-sample-p"><span>top-p (nucleus)</span><b id="fg-sample-p-v">1.00</b></label>
+        <input type="range" id="fg-sample-p" min="0.05" max="1" step="0.01" value="1">
+      </div>
+      <button type="button" class="fg__btn fg__btn--go" id="fg-sample-draw">Draw a token</button>
+      <div class="fg__out" id="fg-sample-result" hidden></div>
+    </div>
+    <div id="fg-sample-bars"></div>
+  </div>
+  <div class="fg__readout">
+    <div><b>temperature</b><span id="fg-sample-tv">0.80</span></div>
+    <div><b>candidates kept</b><span id="fg-sample-kept">&mdash;</span></div>
+    <div><b>entropy</b><span id="fg-sample-h">&mdash;</span></div>
+    <div><b>drawn</b><span id="fg-sample-drawn">&mdash;</span></div>
+  </div>
+</div>
+
+
+<h3>Reading the dials</h3>
+
+<p><strong>Temperature</strong> divides the logits before softmax. Below 1 it sharpens and the
+leader pulls away; above 1 it flattens, and <code>banana</code> starts to have a real chance.
+<strong>Top-k</strong> keeps the k best candidates and renormalises. <strong>Top-p</strong>, or
+nucleus sampling, keeps the smallest set whose probability sums to at least p, so it adapts:
+wide when the model is genuinely uncertain, narrow when it is not. Drag temperature to 2.0 with
+top-p at 1.00 and you can watch fluency dissolve in real time.</p>
+
+<div class="callout callout--note">
+  <span class="callout__label">Where reasoning models fit</span>
+  <p>Test-time compute is a third scaling axis alongside training compute and architectural
+  sparsity. A reasoning model spends many sampled tokens on intermediate work before its visible
+  answer &mdash; same architecture, same sampler, just far more of it. You pay per call rather
+  than once at training time, which is why &ldquo;thinking&rdquo; modes are priced and
+  rate-limited differently.</p>
+</div>
+  </section>
+
+  <section id="kv-cache">
+    <h2><span class="sec-num">05</span>The KV cache, and what context costs</h2>
+<p class="lead">Generation happens one token at a time, and each new token attends to everything
+before it. Recomputing all those keys and values at every step would be absurd, so they are
+cached &mdash; and that cache is what actually limits how long a conversation can get. Long
+context is not a feature. It is a memory bill you pay every step.</p>
+
+<div class="eq">
+  <div class="eq__math">cache_bytes = 2 &times; layers &times; kv_heads &times; head_dim &times; tokens &times; batch &times; bytes_per_value</div>
+  <div class="eq__read"><strong>In words</strong>The leading 2 is one key and one value per
+  position. Multiply by how many layers keep a cache, how many key/value heads each layer has, how
+  wide each head is, how many tokens are in the window, how many requests you are serving at once,
+  and how many bytes each number takes. Every term is a multiplier, and <code>tokens</code> is the
+  one your users control.</div>
+</div>
+
+
+<div class="fg" id="fg-kv">
+  <div class="fg__label"><span>KV cache calculator</span><em id="fg-kv-headline">&mdash;</em></div>
+  <div class="fg__cols">
+    <div>
+      <div class="fg__ctl">
+        <label for="fg-kv-c"><span>context length</span><b id="fg-kv-c-v">128K tokens</b></label>
+        <input type="range" id="fg-kv-c" min="8" max="1024" step="8" value="128">
+      </div>
+      <div class="fg__ctl">
+        <label for="fg-kv-l"><span>layers</span><b id="fg-kv-l-v">64</b></label>
+        <input type="range" id="fg-kv-l" min="16" max="128" step="4" value="64">
+      </div>
+      <div class="fg__ctl">
+        <label for="fg-kv-b"><span>concurrent requests</span><b id="fg-kv-b-v">1</b></label>
+        <input type="range" id="fg-kv-b" min="1" max="64" step="1" value="1">
+      </div>
+      <div class="fg__ctl">
+        <span class="fg__fieldlabel">bytes per value</span>
+        <div class="fg__row" id="fg-kv-prec">
+          <button type="button" class="fg__btn" data-value="4" aria-pressed="false">fp32</button>
+          <button type="button" class="fg__btn" data-value="2" aria-pressed="true">fp16</button>
+          <button type="button" class="fg__btn" data-value="1" aria-pressed="false">fp8</button>
+          <button type="button" class="fg__btn" data-value="0.5" aria-pressed="false">fp4</button>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="fg__ctl">
+        <label for="fg-kv-q"><span>query heads</span><b id="fg-kv-q-v">64</b></label>
+        <input type="range" id="fg-kv-q" min="8" max="128" step="4" value="64">
+      </div>
+      <div class="fg__ctl">
+        <label for="fg-kv-kvh"><span>key/value heads (GQA)</span><b id="fg-kv-kvh-v">8</b></label>
+        <input type="range" id="fg-kv-kvh" min="1" max="64" step="1" value="8">
+      </div>
+      <div class="fg__ctl">
+        <label for="fg-kv-d"><span>head dimension</span><b id="fg-kv-d-v">128</b></label>
+        <input type="range" id="fg-kv-d" min="64" max="256" step="16" value="128">
+      </div>
+      <div class="fg__barrow" style="margin-top:1rem"><span>Full MHA</span>
+        <div class="fg__bar" style="width:100%;background:var(--rule-strong)"></div>
+        <em id="fg-kv-mha">&mdash;</em></div>
+      <div class="fg__barrow"><span>With GQA</span>
+        <div class="fg__bar" id="fg-kv-gqabar"></div>
+        <em id="fg-kv-gqa">&mdash;</em></div>
+    </div>
+  </div>
+  <div class="fg__readout">
+    <div><b>context</b><span id="fg-kv-ctx">128K</span></div>
+    <div><b>KV cache</b><span id="fg-kv-total">&mdash;</span></div>
+    <div><b>vs. full MHA</b><span id="fg-kv-save">&mdash;</span></div>
+    <div><b>per 1K tokens</b><span id="fg-kv-per">&mdash;</span></div>
+  </div>
+</div>
+
+
+<h3>Grouped-query attention, and why every model has it now</h3>
+
+<p>Notice that the cache scales with <em>key/value</em> heads, not query heads. Grouped-query
+attention exploits exactly that: keep all the query heads, but let groups of them share one set of
+keys and values<a href="#r7" class="cit">7</a>. Drag KV heads from 64 down to 8 above &mdash; an
+eightfold cut in cache for a small quality cost. Other approaches attack the same term
+differently; DeepSeek-V3 uses multi-head latent attention, compressing keys and values into a
+low-rank latent vector rather than reducing the head count<a href="#r4" class="cit">4</a>.</p>
+
+
+<div class="fg">
+  <div class="fg__label"><span>Prefill vs. decode</span><em>shape of each curve, not their sizes</em></div>
+  <div class="fg__chart" id="fg-cost"></div>
+  <p class="fg__key">
+    <i style="background:var(--fg-indigo)"></i>prefill &mdash; reading the prompt; its attention
+    term grows with the square of the length &nbsp;&middot;&nbsp;
+    <i style="background:var(--teal)"></i>decode &mdash; writing each token, in proportion to length
+  </p>
+  <p class="fg__note">Each series is scaled to its own maximum, so what you can read off this is
+     curvature: one bows, the other is a ramp. The two heights in a single column are
+     <em>not</em> comparable &mdash; prefill and decode cost different things, and any point where
+     the bars happen to meet is an artifact of the units rather than a context length at which
+     something real changes.</p>
+</div>
+
+
+<p>Two phases with different economics. Prefill reads your whole prompt in one parallel pass, and
+its attention term grows with the square of the length. Decode then emits tokens one at a time,
+cheap per token but bound by memory bandwidth rather than arithmetic. A long prompt with a short
+answer is prefill-dominated; a short prompt with a long answer is decode-dominated. Prompt caching
+attacks the first, speculative decoding the second.</p>
+
+<div class="callout callout--caveat">
+  <span class="callout__label">Why the agent bill surprises people</span>
+  <p>Conversation history is resent on every turn, so cost accumulates against the running total
+  rather than the last message. Ten turns that each add 2K tokens do not cost 20K of input: turn
+  one reads 2K, turn two reads 4K, and turn ten reads 20K, for about 110K altogether. Hold the
+  window at a full 20K for all ten turns and it is 200K. Either way the bill grows with the square
+  of the conversation, not with its length, which is why compaction and pruning pay off
+  compounding rather than linearly.</p>
+</div>
+  </section>
+
+  <section id="frontier">
+    <h2><span class="sec-num">06</span>Where frontier models diverge</h2>
+<p class="lead">Everything in the previous chapters is common to all of them. The differences sit
+in four places &mdash; and unlike model names, context windows and prices, these four axes have
+stayed stable across several generations. They are what to reason about; the leaderboard is what
+to look up.</p>
+
+<h3>Axis 1 &middot; Sparsity</h3>
+
+<p>Does the model activate all of its parameters for every token, or a fraction? Dense buys
+predictable latency and simpler serving. Sparse buys far more stored capacity per unit of
+inference compute, at the cost of holding every expert in memory anyway. The published trajectory
+of open models runs strongly toward sparse: 28% active for Mixtral 8x22B in April
+2024<a href="#r5" class="cit">5</a>, 5.5% for DeepSeek-V3 that December<a href="#r4" class="cit">4</a>,
+7.3% for Qwen3-Coder-480B-A35B in July 2025<a href="#r6" class="cit">6</a>.</p>
+
+<div class="table-scroll">
+  <table>
+    <caption>Dense versus sparse &mdash; the standing trade</caption>
+    <thead><tr><th>Consideration</th><th>Dense</th><th>Sparse / MoE</th></tr></thead>
+    <tbody>
+      <tr><td>Params active</td><td>100% every token</td><td>A single-digit to low-double-digit percentage</td></tr>
+      <tr><td>Memory footprint</td><td>Proportional to compute</td><td>All experts resident regardless of routing</td></tr>
+      <tr><td>Latency</td><td>Flat, predictable</td><td>Varies with routing and expert parallelism</td></tr>
+      <tr><td>Capacity per FLOP</td><td>Lower</td><td>Much higher</td></tr>
+      <tr><td>Training stability</td><td>Well understood</td><td>Router collapse and load balancing need explicit handling</td></tr>
+      <tr><td>Post-training</td><td>Straightforward</td><td>Touching the router disturbs learned balance</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<h3>Axis 2 &middot; Attention geometry</h3>
+
+<p>Nobody runs plain quadratic attention at very long context. The cache formula from the previous
+chapter has several terms, and each one has become a target. Reduce the key/value head count and
+you get grouped-query attention<a href="#r7" class="cit">7</a>. Compress keys and values into a
+low-rank latent and you get multi-head latent attention, as in
+DeepSeek-V3<a href="#r4" class="cit">4</a>. Restrict which positions each token may attend to and
+you get one of the many sparse-attention patterns. Replace some attention layers with recurrent or
+state-space blocks and you get a hybrid. These are not interchangeable: they trade quality, cache
+size and implementation complexity differently, and a model's long-context behaviour is largely
+downstream of which one it picked.</p>
+
+<h3>Axis 3 &middot; Advertised context versus context that works</h3>
+
+<p>This is the number most worth distrusting, and the reason is mechanical rather than commercial.
+Attention has to spread a fixed probability mass over every position, so precision on any one of
+them falls as the span grows.</p>
+
+<p>The cleanest published demonstration is NoLiMa, which deliberately strips literal keyword
+overlap between the question and the buried fact, forcing associative retrieval rather than
+pattern matching. Across models claiming at least 128K of context, performance held up in short
+contexts and fell sharply as length grew; at 32K, most of the models tested scored at or below
+half their short-context baseline. GPT-4o, one of the stronger performers, dropped from a 99.3%
+baseline to 69.7% at 32K<a href="#r8" class="cit">8</a>.</p>
+
+<p>The practical reading: treat an advertised window as a hard ceiling on what fits, not as a
+promise about what the model will reliably use. And note that the ranking depends on task shape
+&mdash; single-fact retrieval, multi-fact retrieval and long-range reasoning degrade at different
+rates &mdash; so a single &ldquo;effective context&rdquo; percentage is the wrong abstraction.
+Measure on your own task.</p>
+
+<h3>Axis 4 &middot; Test-time compute</h3>
+
+<p>The newest axis, and the one that breaks cost estimates. A reasoning model spends tokens on
+intermediate work before answering, so the same nominal model can consume wildly different compute
+per request depending on how much of that it does. Qwen3-Coder's post-training used long-horizon
+reinforcement learning across many parallel environments specifically to train multi-turn tool
+interaction<a href="#r6" class="cit">6</a> &mdash; capability that shows up at inference as more
+tokens spent, not as a bigger network.</p>
+
+<div class="callout callout--caveat">
+  <span class="callout__label">What this chapter deliberately omits</span>
+  <p>An earlier draft carried a table of named current models with context windows and
+  per-million-token prices. It has been removed. Those figures came from secondary comparison
+  sites rather than model cards, and they go stale within months, which makes them exactly the
+  wrong thing to fix in a document meant to last. The four axes above are stable. Check current
+  model cards for the numbers.</p>
+</div>
+  </section>
+
+  <section id="weights">
+    <h2><span class="sec-num">07</span>Weights, training and tuning</h2>
+<p class="lead">You have already met them. The embedding matrix in chapter 01, the query and key
+projections in chapter 02, the feed-forward layers in chapter 03 &mdash; those matrices
+<em>are</em> the weights. A &ldquo;70B model&rdquo; is 70 billion numbers, and training is the
+process of nudging each one until next-token prediction gets good.</p>
+
+<p>Nothing in there is a fact in any retrievable sense. There is no row for your company's return
+policy, no lookup table of dates. Knowledge is smeared across billions of parameters as a side
+effect of compressing text well enough to predict it. That is why models can be simultaneously
+encyclopedic and confidently wrong, and why you cannot edit a fact out of one.</p>
+
+<h3>How a base model becomes an assistant</h3>
+
+<p>Pretraining alone produces something that continues text but will not reliably answer a
+question. Further stages fix that, and they are small by comparison. DeepSeek-V3's report
+describes exactly this shape: pretraining on 14.8 trillion tokens, followed by supervised
+fine-tuning and reinforcement learning stages<a href="#r4" class="cit">4</a>.</p>
+
+<div class="table-scroll">
+  <table>
+    <caption>Three stages, wildly different budgets</caption>
+    <thead><tr><th>Stage</th><th>Scale</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td>Pretraining</td><td>Trillions of tokens</td><td>Predict the next token over a very
+        large corpus. Where the weights come from, and where essentially all the cost sits.</td></tr>
+      <tr><td>Supervised fine-tuning</td><td>Thousands to millions of pairs</td><td>Curated
+        instruction and response pairs. Teaches the base model to answer rather than autocomplete.</td></tr>
+      <tr><td>Reinforcement learning</td><td>Preference or reward signal</td><td>Optimise toward
+        preferred responses, from human comparisons, model judgments or task reward. Where tone,
+        refusals and format habits are set.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<p>Most of what you experience as a model's &ldquo;personality&rdquo; &mdash; how it formats, when
+it hedges, what it declines &mdash; was installed in those later stages, on a data budget rounding
+to zero against pretraining. That is also why two labs can start from similar architectures and
+ship products that feel nothing alike.</p>
+
+<h3>Open weights, and what the phrase does not mean</h3>
+
+<p>Open weights means the trained numbers are downloadable: you can run the model on your own
+hardware, inspect it, quantize it, fine-tune it, and keep your data off someone else's API. It
+does <em>not</em> mean open source in the usual sense &mdash; training data and training code are
+almost never released, so the artifact is reproducible only in the way a compiled binary is.</p>
+
+<p>The licences differ sharply and matter commercially. Some are genuinely permissive: Mistral
+released Mixtral 8x22B under Apache 2.0, describing it as the most permissive option and allowing
+use without restriction<a href="#r5" class="cit">5</a>, and Qwen3-Coder-480B-A35B shipped under
+Apache 2.0 as well<a href="#r6" class="cit">6</a>. Others impose usage restrictions, user-count
+thresholds or naming requirements, which makes them open weights but not Apache-equivalent for a
+business. Read the licence file in the repository, not the announcement blog post.</p>
+
+<h3>The adaptation ladder</h3>
+
+<p>When a model does not do what you need, there are four rungs, and the discipline is to climb
+only as far as necessary. Most teams jump to fine-tuning when what they needed was retrieval.</p>
+
+<div class="table-scroll">
+  <table>
+    <thead><tr><th>Rung</th><th>Changes</th><th>Use when</th><th>Wrong for</th></tr></thead>
+    <tbody>
+      <tr><td>Prompting</td><td>Nothing &mdash; context only</td><td>The behaviour is achievable,
+        you just have not specified it</td><td>Rules that must hold across a thousand calls</td></tr>
+      <tr><td>Retrieval</td><td>Nothing &mdash; context only</td><td>The model lacks
+        <em>facts</em> you own</td><td>Style, format, or a domain vocabulary it has never seen</td></tr>
+      <tr><td>LoRA / adapters</td><td>A fraction of a percent of weights</td><td>You need
+        consistent style or format at low latency cost</td><td>Teaching genuinely new knowledge</td></tr>
+      <tr><td>Full fine-tune</td><td>All weights</td><td>New modality, new language, deep domain
+        shift</td><td>Almost everything else &mdash; expensive, and it forgets</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<p>The rule of thumb: <strong>fine-tuning teaches form, retrieval supplies facts.</strong> If your
+failure is &ldquo;it does not know our SKUs,&rdquo; no amount of tuning fixes it reliably &mdash;
+the model will learn to produce SKU-shaped strings, which is worse than not knowing. If your
+failure is &ldquo;it will not stop writing like a press release,&rdquo; tuning is exactly right.</p>
+
+<h3>Why LoRA works</h3>
+
+<p>Low-rank adaptation freezes every original weight and inserts a pair of thin matrices beside
+each target layer. Instead of updating a d&times;d matrix, you train a d&times;r and an r&times;d
+and add their product, so each adapted matrix costs 2&middot;r&middot;d trainable parameters
+instead of d&sup2;. The adaptation is constrained to a low-rank subspace, which turns out to be
+plenty, because task adaptation is a much smaller change than the model
+itself<a href="#r9" class="cit">9</a>.</p>
+
+
+<div class="fg" id="fg-lora">
+  <div class="fg__label"><span>LoRA vs. full fine-tune</span><em id="fg-lora-ratio">&mdash;</em></div>
+  <div class="fg__cols">
+    <div>
+      <div class="fg__ctl">
+        <label for="fg-lora-p"><span>model size</span><b id="fg-lora-p-v">70B params</b></label>
+        <input type="range" id="fg-lora-p" min="1" max="700" step="1" value="70">
+      </div>
+      <div class="fg__ctl">
+        <label for="fg-lora-dm"><span>hidden dimension</span><b id="fg-lora-dm-v">8192</b></label>
+        <input type="range" id="fg-lora-dm" min="1024" max="16384" step="512" value="8192">
+      </div>
+      <div class="fg__ctl">
+        <label for="fg-lora-l"><span>layers</span><b id="fg-lora-l-v">80</b></label>
+        <input type="range" id="fg-lora-l" min="16" max="128" step="4" value="80">
+      </div>
+    </div>
+    <div>
+      <div class="fg__ctl">
+        <label for="fg-lora-rank"><span>LoRA rank (r)</span><b id="fg-lora-rank-v">16</b></label>
+        <input type="range" id="fg-lora-rank" min="1" max="256" step="1" value="16">
+      </div>
+      <div class="fg__ctl">
+        <span class="fg__fieldlabel">frozen base precision</span>
+        <div class="fg__row" id="fg-lora-prec">
+          <button type="button" class="fg__btn" data-value="4" aria-pressed="false">fp32</button>
+          <button type="button" class="fg__btn" data-value="2" aria-pressed="true">fp16</button>
+          <button type="button" class="fg__btn" data-value="1" aria-pressed="false">fp8</button>
+          <button type="button" class="fg__btn" data-value="0.5" aria-pressed="false">fp4</button>
+        </div>
+      </div>
+      <div class="fg__row" style="margin-top:.7rem">
+        <button type="button" class="fg__btn" id="fg-lora-ffn" aria-pressed="false">Also target FFN</button>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:1.15rem">
+    <div class="fg__barrow" style="grid-template-columns:9rem 1fr 5rem"><span>Full fine-tune</span>
+      <div class="fg__bar" style="width:100%;background:var(--rule-strong)"></div>
+      <em id="fg-lora-bfull">&mdash;</em></div>
+    <div class="fg__barrow" style="grid-template-columns:9rem 1fr 5rem"><span>LoRA</span>
+      <div class="fg__bar" id="fg-lora-blora"></div>
+      <em id="fg-lora-blorav">&mdash;</em></div>
+    <div class="fg__barrow" style="grid-template-columns:9rem 1fr 5rem"><span>Trainable params</span>
+      <div class="fg__bar" id="fg-lora-btr"></div>
+      <em id="fg-lora-btrv">&mdash;</em></div>
+  </div>
+  <p class="fg__note" id="fg-lora-note"></p>
+  <div class="fg__readout">
+    <div><b>LoRA rank</b><span id="fg-lora-r">16</span></div>
+    <div><b>trainable</b><span id="fg-lora-share">&mdash;</span></div>
+    <div><b>full FT</b><span id="fg-lora-full">&mdash;</span></div>
+    <div><b>LoRA</b><span id="fg-lora-lorav">&mdash;</span></div>
+  </div>
+</div>
+
+
+<h3>Quantization, and the thread back to chapter 05</h3>
+
+<p>Switch the base precision above from fp16 to fp4 and watch the LoRA figure fall by another
+factor of four. Quantization stores each weight in fewer bits, and the quality cost has fallen far
+enough that it is now applied during training rather than bolted on afterwards &mdash; DeepSeek-V3
+validated FP8 mixed-precision training at 671B parameters<a href="#r4" class="cit">4</a>. It
+compounds with the cache arithmetic from chapter 05: lower precision shrinks both the weights you
+hold and the cache you accumulate.</p>
+
+<div class="callout callout--caveat">
+  <span class="callout__label">One MoE trap worth knowing</span>
+  <p>Sparse models complicate all of this. The router is a learned load-balancing artifact, and
+  adapting a mixture-of-experts model usually means touching experts or attention while leaving
+  the router alone &mdash; disturbing it undoes balance the pretraining run worked to
+  establish<a href="#r4" class="cit">4</a>. One more reason dense models remain easier to
+  post-train.</p>
+</div>
+  </section>
+
+  <section id="prompting">
+    <h2><span class="sec-num">08</span>Prompt engineering</h2>
+<p class="lead">The model is sampling from a distribution over plausible continuations. A vague
+prompt has an enormous space of plausible continuations, so you get the average of them. Every
+constraint you add cuts that space down. Prompt engineering is specification writing, not
+incantation.</p>
+
+<p>That framing kills most of the folklore. Magic words do not help. Saying &ldquo;you are a
+world-class expert&rdquo; helps only insofar as it narrows the register. What reliably helps is
+boring: state the audience, state the format, state the success criteria, supply the facts, and
+show an example of what right looks like.</p>
+
+<p>Four pairs follow. Each pair asks for the same thing twice, and the difference between them is
+the entire argument. Read them as specifications and ask what the vague one leaves open.</p>
+
+<div class="fg">
+  <div class="fg__label"><span>Pair 1 &mdash; specificity</span></div>
+  <div class="fg-prompt"><b>A &mdash; vague</b>Write about our Q3 numbers.</div>
+  <div class="fg-prompt"><b>B &mdash; specified</b>Write a 120-word update on Q3 results for the ops team. State revenue direction, the single biggest driver, and one risk. No adjectives that aren&rsquo;t backed by a number. Assume revenue rose 14% on renewals, and churn in SMB is the risk.</div>
+  <p class="fg__note">A leaves the audience, the length, the format and the facts unspecified, so
+  the model supplies all four from the average of its training distribution &mdash; including
+  the numbers, which it will invent. B leaves only the wording open.</p>
+</div>
+
+<div class="fg">
+  <div class="fg__label"><span>Pair 2 &mdash; role and output contract</span></div>
+  <div class="fg-prompt"><b>A</b>Is this contract clause risky?<br><br>&lsquo;Either party may terminate for convenience with 7 days notice.&rsquo;</div>
+  <div class="fg-prompt"><b>B</b>You review vendor contracts for a mid-size buyer. Assess the clause below.<br><br>Respond as exactly three labelled lines:<br>RISK: low | medium | high<br>WHY: one sentence<br>ASK: the specific redline to request<br><br>Clause: &lsquo;Either party may terminate for convenience with 7 days notice.&rsquo;</div>
+  <p class="fg__note">Risky to whom is the question A cannot answer. B fixes the vantage point and
+  names an output shape you can parse, which matters the moment this runs a thousand times
+  instead of once.</p>
+</div>
+
+<div class="fg">
+  <div class="fg__label"><span>Pair 3 &mdash; show, don't describe</span></div>
+  <div class="fg-prompt"><b>A</b>Turn these into consistent task titles: fix the login bug, database is slow sometimes, users confused by settings page</div>
+  <div class="fg-prompt"><b>B</b>Rewrite each item as a task title in the exact style of these examples:<br><br>Input: emails not sending &rarr; Output: Fix &mdash; outbound email delivery failure<br>Input: dashboard loads forever &rarr; Output: Perf &mdash; dashboard initial load latency<br><br>Now do these:<br>fix the login bug<br>database is slow sometimes<br>users confused by settings page</div>
+  <p class="fg__note">&ldquo;Consistent&rdquo; is not a specification &mdash; consistent with what?
+  Two worked examples pin down a category prefix, a dash, and a noun phrase, which three sentences
+  of description would not.</p>
+</div>
+
+<div class="fg">
+  <div class="fg__label"><span>Pair 4 &mdash; positive constraints</span></div>
+  <div class="fg-prompt"><b>A</b>Explain what an API is. Don&rsquo;t be too technical, don&rsquo;t use jargon, don&rsquo;t make it long, don&rsquo;t use analogies that are clich&eacute;.</div>
+  <div class="fg-prompt"><b>B</b>Explain what an API is to a procurement manager evaluating software vendors. Use exactly two short paragraphs. Ground it in one concrete example from purchasing or logistics. Plain business vocabulary only.</div>
+  <p class="fg__note">Four prohibitions still leave the target unspecified; the model has to guess
+  what counts as too technical. B states the target once and the prohibitions become unnecessary.</p>
+</div>
+
+<h3>What actually moves the needle</h3>
+
+<p><strong>Say what to do, not what to avoid.</strong> &ldquo;Don't be verbose&rdquo; leaves the
+target unspecified; &ldquo;two paragraphs, 120 words&rdquo; does not.
+<strong>Examples beat adjectives.</strong> Two input/output pairs pin down a style that three
+sentences of description will not. <strong>Name the output contract.</strong> If you need to parse
+the result, specify the shape exactly. <strong>Give it the facts.</strong> Most
+&ldquo;hallucinations&rdquo; in business use are the model filling a gap you left open &mdash; it
+had no way to know your churn number, so it invented a plausible one.</p>
+
+<div class="callout callout--caveat">
+  <span class="callout__label">The honest limit</span>
+  <p>Prompting steers a single call. It cannot fix stale information, cannot enforce a rule across
+  a hundred calls, and cannot be versioned or audited well. That is the wall the next chapter is
+  about.</p>
+</div>
+  </section>
+
+  <section id="context-engineering">
+    <h2><span class="sec-num">09</span>Context engineering</h2>
+<p class="lead">Prompt engineering is about how you instruct the model. Context engineering is
+about what the model knows when it answers &mdash; the whole contents of the window, including
+retrieved documents, memory, tool definitions, tool outputs and conversation history. Prompting
+is one component of it, not the other way round.</p>
+
+<p>The shift happened because agents broke the single-call assumption. A prompt steers one call.
+An agent strings many together, against inputs nobody saw at authoring time, accumulating tool
+output as it goes. The window stops being something you write and becomes something you
+budget.</p>
+
+
+<div class="fg" id="fg-budget">
+  <div class="fg__label"><span>Context budget</span><em id="fg-bg-headline">&mdash;</em></div>
+  <div class="fg__stack" id="fg-bg-stack" role="img" aria-label="Stacked allocation of the context window"></div>
+  <div class="fg__legend" id="fg-bg-legend"></div>
+  <div class="fg__cols" style="margin-top:1.25rem">
+    <div>
+      <div class="fg__ctl">
+        <label for="fg-bg-w"><span>context window</span><b id="fg-bg-w-v">200K</b></label>
+        <input type="range" id="fg-bg-w" min="32" max="1000" step="8" value="200">
+      </div>
+      <div class="fg__ctl">
+        <label for="fg-bg-sys"><span>system prompt</span><b id="fg-bg-sys-v">3K</b></label>
+        <input type="range" id="fg-bg-sys" min="0" max="40" step="1" value="3">
+      </div>
+      <div class="fg__ctl">
+        <label for="fg-bg-tools"><span>tool definitions</span><b id="fg-bg-tools-v">12K</b></label>
+        <input type="range" id="fg-bg-tools" min="0" max="80" step="1" value="12">
+      </div>
+    </div>
+    <div>
+      <div class="fg__ctl">
+        <label for="fg-bg-docs"><span>retrieved documents</span><b id="fg-bg-docs-v">45K</b></label>
+        <input type="range" id="fg-bg-docs" min="0" max="300" step="1" value="45">
+      </div>
+      <div class="fg__ctl">
+        <label for="fg-bg-hist"><span>conversation history</span><b id="fg-bg-hist-v">60K</b></label>
+        <input type="range" id="fg-bg-hist" min="0" max="400" step="1" value="60">
+      </div>
+      <div class="fg__ctl">
+        <label for="fg-bg-res"><span>reserved for output</span><b id="fg-bg-res-v">8K</b></label>
+        <input type="range" id="fg-bg-res" min="1" max="64" step="1" value="8">
+      </div>
+    </div>
+  </div>
+  <div class="fg__out" id="fg-bg-status"></div>
+  <div class="fg__readout">
+    <div><b>window</b><span id="fg-bg-win">200K</span></div>
+    <div><b>allocated</b><span id="fg-bg-used">&mdash;</span></div>
+    <div><b>fill</b><span id="fg-bg-fill">&mdash;</span></div>
+    <div><b>headroom</b><span id="fg-bg-head">&mdash;</span></div>
+  </div>
+</div>
+
+
+<h3>The failure modes have names</h3>
+
+<p><strong>Poisoning</strong> &mdash; a wrong fact enters early and is treated as ground truth by
+every later turn, so small initial errors compound rather than wash out.
+<strong>Distraction</strong> &mdash; retrieved chunks that match on keywords but not intent crowd
+out the ones that mattered. <strong>Clash</strong> &mdash; two retrieved documents contradict each
+other and the model picks arbitrarily. <strong>Rot</strong> &mdash; material in the middle of a
+long window gets attended to least.</p>
+
+<h3>The layers</h3>
+
+<p>It helps to separate the stack rather than call everything &ldquo;prompting&rdquo;: the wording
+of a message, the contents of the window, the loop an agent runs, and the harness around it
+&mdash; tools, stopping rules, retries, permissions. When an agent misbehaves, deciding which
+layer to edit determines everything about the fix. Rewriting a paragraph when the real problem is
+retrieval is the most common way to spend a week on nothing.</p>
+
+<p>The counterintuitive result is that less context usually beats more. A small, well-chosen set
+of passages drawn from a large corpus tends to outperform dumping the corpus in, because
+retrieval acts as a relevance filter that attention alone does not replicate at scale. The
+long-context degradation from chapter 06 is the mechanism behind
+that<a href="#r8" class="cit">8</a>.</p>
+  </section>
+
+  <section id="retrieval">
+    <h2><span class="sec-num">10</span>Retrieval</h2>
+<p class="lead">Retrieval-augmented generation is the standard answer to &ldquo;the model does not
+know our stuff.&rdquo; Index your documents, find the few passages relevant to the question, put
+those in the context, then generate. Don't put the library in the prompt &mdash; send the model to
+the shelf.</p>
+
+<p>The pipeline is short and every stage can ruin you: chunk the corpus, embed each chunk into a
+vector, store it in an index, embed the query the same way, take the nearest neighbours,
+optionally rerank with a stronger model, then assemble. Chunking is the most underrated stage
+&mdash; split mid-clause and you retrieve a fragment that is technically relevant and practically
+useless.</p>
+
+<p>The panel below runs the retrieval stage for real, scoring a five-document policy corpus
+against your question in the page. Nothing is generated: what you are watching is the part that
+decides what a model would have been given.</p>
+
+
+<div class="fg" id="fg-rag">
+  <div class="fg__label"><span>Retrieval &mdash; live</span><em>term scoring over five policy documents</em></div>
+  <label class="fg__fieldlabel" for="fg-rag-q">Customer question</label>
+  <textarea id="fg-rag-q" rows="2">I opened a custom-built unit two weeks ago and want to send it back &mdash; can I?</textarea>
+  <div class="fg__ctl" style="margin-top:.8rem">
+    <label for="fg-rag-k"><span>top-k</span><b id="fg-rag-k-v">2</b></label>
+    <input type="range" id="fg-rag-k" min="1" max="5" step="1" value="2">
+  </div>
+  <div id="fg-rag-bars"></div>
+  <p class="fg__note">Rewrite the question and the ranking moves. Ask about a refund and POL-04
+     wins; ask when something arrives and POL-09 takes over. Ask in words the documents never
+     use &mdash; &ldquo;send it back&rdquo; instead of &ldquo;return&rdquo; &mdash; and watch the
+     scores collapse, which is the failure mode term matching cannot fix.</p>
+  <div class="fg__readout">
+    <div><b>corpus</b><span>5 docs</span></div>
+    <div><b>top-k</b><span id="fg-rag-topk">2</span></div>
+    <div><b>retrieved</b><span id="fg-rag-top">&mdash;</span></div>
+  </div>
+</div>
+
+
+<p>The reason this stage carries so much weight is that the ungrounded answer is usually the more
+dangerous one: fluent, confident, plausible and invented. Nothing in any model's training data
+contains this company's restocking fee. A generic answer about returns will sound entirely
+reasonable and will get the 21-day window, the 15% fee and the custom-configuration exclusion
+wrong, because it has no way to know them.</p>
+
+<div class="callout callout--caveat">
+  <span class="callout__label">Where the real difficulty lives</span>
+  <p>Term matching, used here, fails on paraphrase; pure vector search fails on exact identifiers
+  like order numbers or SKUs. Production systems run hybrid retrieval and then rerank. And
+  retrieval is increasingly on-demand rather than pre-loaded, which is the bridge to the next
+  chapter.</p>
+</div>
+  </section>
+
+  <section id="tool-loops">
+    <h2><span class="sec-num">11</span>Tool loops and agents</h2>
+<p class="lead">Give the model a set of tools it can call, run it, and when it asks for a tool,
+execute it and hand the result back into the conversation. Repeat until it stops asking. An agent
+is a while-loop with a language model inside it &mdash; everything else is engineering around that
+loop.</p>
+
+<p>The pattern was named early. Interleaving reasoning traces with actions lets the model plan,
+call an external source, fold the observation back into its reasoning, and adjust; the original
+work reports that this reduces the hallucination and error propagation that pure chain-of-thought
+suffers, because the model is grounded against something outside
+itself<a href="#r10" class="cit">10</a>.</p>
+
+<p>Mechanically, tools are JSON schemas in the context window. The model emits a structured
+request rather than prose; your runtime executes it and appends the output as a new message. The
+model never touches your database &mdash; it writes a request that your code decides whether to
+honour. Every tool definition also costs context, permanently, on every call.</p>
+
+<div class="fg">
+  <div class="fg__label"><span>The shape of one iteration</span><em>message blocks, not a recorded run</em></div>
+  <div class="fg-prompt"><b>1 &middot; user</b>What are the current best practices for evaluating LLM applications in production?</div>
+  <div class="fg-prompt"><b>2 &middot; assistant &rarr; text</b>A reasoning block, where the model works out that it does not know this and needs to look it up.</div>
+  <div class="fg-prompt"><b>3 &middot; assistant &rarr; tool_use</b>A structured call: the tool name, plus arguments matching the schema you supplied. Your runtime, not the model, decides whether to run it.</div>
+  <div class="fg-prompt"><b>4 &middot; user &rarr; tool_result</b>Whatever your code returned, appended to the conversation as a new message and now permanently part of the context.</div>
+  <div class="fg-prompt"><b>5 &middot; assistant &rarr; text</b>The answer, or another tool_use block and around again.</div>
+  <p class="fg__note">This is the block structure the loop actually moves through, not a
+  transcript of any particular run. The loop terminates when step 5 produces no further
+  tool_use &mdash; or when your harness stops it, which is the case you have to design for.</p>
+</div>
+
+<h3>Why loops are where things break</h3>
+
+<p>Each iteration appends tool output to the context, so a ten-step task can multiply its own
+prompt several times over &mdash; and by chapter 05's arithmetic, you re-read all of it every
+step. Errors compound rather than cancel: a bad retrieval at step two is treated as fact by step
+seven. And the model has no reliable way to know it is stuck; without an explicit stop criterion
+it will happily loop.</p>
+
+<p>So the real design work is in the harness: what tools exist, when the loop stops, what gets
+pruned from context between steps, what happens on failure, and what the model may do without a
+human in the way. Almost every agent failure that looks like a model problem is one of those five
+decisions left unmade.</p>
+  </section>
+
+  <section id="evals">
+    <h2><span class="sec-num">12</span>Evals</h2>
+<p class="lead">Everything in this guide is a knob. Change the prompt, swap the model, adjust
+retrieval, add a tool &mdash; each shifts behaviour in ways you cannot predict and will not notice
+by reading a few outputs. An eval set converts &ldquo;it seems better&rdquo; into a number.
+Without evals, you do not have a system. You have a demo.</p>
+
+<p>The minimum viable version is unglamorous: twenty to fifty real inputs, written criteria for
+each, and a grader. Deterministic checks &mdash; does it parse, is it under the word limit, does
+it contain the ID &mdash; run free and should carry as much of the load as possible. Everything
+subjective goes to a judge, human or model.</p>
+
+<p>Model-as-judge is useful and biased. It favours longer answers, its own phrasing style, and
+outputs that look confident. It is a fast proxy, not a verdict &mdash; calibrate it against human
+labels on a subset before trusting it.</p>
+
+<p>Three cases, of the kind a real set is built from. Note that the criteria do the work: each one
+is checkable by someone who has never seen the system.</p>
+
+<div class="table-scroll">
+  <table>
+    <caption>A starter eval set</caption>
+    <thead><tr><th>Case</th><th>Input</th><th>Passing criteria</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>E1</td>
+        <td>A customer asks for a refund 30 days after delivery. Our window is 21 days. Reply in
+            under 40 words.</td>
+        <td>Refuses clearly, cites the 21-day limit, stays polite, under 40 words.</td>
+      </tr>
+      <tr>
+        <td>E2</td>
+        <td>Summarise in one sentence: the vendor missed the March deadline, delivered partial
+            functionality in April, and has not responded to three escalation emails since.</td>
+        <td>One sentence, and captures all three failures &mdash; the missed deadline, the partial
+            delivery <em>and</em> the unanswered escalations.</td>
+      </tr>
+      <tr>
+        <td>E3</td>
+        <td>What was our company's revenue last quarter?</td>
+        <td>Declines to invent a figure and states that it lacks the data. Any specific number is
+            a failure.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<p>E3 is the one worth watching. It asks for a number the system was never given, and passing
+means refusing. Most quality problems in deployed systems look like this &mdash; not wrong
+reasoning, but confident answers to questions the system had no inputs for. An eval set that only
+contains questions your system can answer will pass forever and tell you nothing.</p>
+
+<div class="callout callout--intuition">
+  <span class="callout__label">Run them before you need them</span>
+  <p>Write the eval set before the first prompt change, not after the first incident. The value is
+  not the score; it is that you can change something and find out within a minute whether you made
+  it worse. Every layer in this guide &mdash; prompt, context, retrieval, loop, harness &mdash; is
+  only tunable if you can measure it.</p>
+</div>
+  </section>
+
+  <section id="glossary">
+    <h2><span class="sec-num">13</span>Glossary</h2>
+<dl class="glossary">
+  <dt>Token</dt>
+  <dd>The unit a model actually reads: a chunk of a few characters, swapped for its row number in
+  a fixed vocabulary before anything else happens.</dd>
+
+  <dt>Embedding</dt>
+  <dd>The learned vector a token's row number points at. Meaning lives in its direction, not in
+  the number.</dd>
+
+  <dt>Logit</dt>
+  <dd>A raw, unnormalised score the final layer produces for every vocabulary entry. Softmax turns
+  a set of logits into probabilities.</dd>
+
+  <dt>Softmax</dt>
+  <dd>The function that turns arbitrary scores into a probability distribution summing to one, by
+  exponentiating each and dividing by the total.</dd>
+
+  <dt>Temperature, top-k, top-p</dt>
+  <dd>Sampler settings. Temperature sharpens or flattens the distribution; top-k keeps the k best
+  candidates; top-p keeps the smallest set whose probability reaches p.</dd>
+
+  <dt>KV cache</dt>
+  <dd>The stored keys and values for every token generated so far, kept so each new token does not
+  force a recomputation of the whole sequence. It is usually what limits context length in
+  practice.</dd>
+
+  <dt>GQA &mdash; grouped-query attention</dt>
+  <dd>Letting several query heads share one set of key and value heads, which cuts the cache in
+  proportion to the sharing ratio at small quality cost.</dd>
+
+  <dt>MoE &mdash; mixture of experts</dt>
+  <dd>Splitting the feed-forward network into many sub-networks and routing each token to a few of
+  them, so total capacity and per-token compute stop being the same number.</dd>
+
+  <dt>Router</dt>
+  <dd>The small learned network that decides which experts a token goes to. Its balance is
+  fragile, which is why fine-tuning usually leaves it alone.</dd>
+
+  <dt>Prefill and decode</dt>
+  <dd>The two phases of a request. Prefill reads the prompt in one parallel pass; decode emits
+  tokens one at a time and is bound by memory bandwidth.</dd>
+
+  <dt>LoRA</dt>
+  <dd>Low-rank adaptation: freeze the original weights and train a thin pair of matrices beside
+  each target layer, so a fraction of a percent of the parameters carries the adaptation.</dd>
+
+  <dt>Quantization</dt>
+  <dd>Storing weights, or cached keys and values, in fewer bits per number. Shrinks both the model
+  and the cache.</dd>
+
+  <dt>RAG &mdash; retrieval-augmented generation</dt>
+  <dd>Finding the few passages relevant to a question and putting those in the context, rather
+  than relying on what the weights happen to encode.</dd>
+
+  <dt>Test-time compute</dt>
+  <dd>Spending more tokens on intermediate reasoning at inference rather than more parameters at
+  training. A third scaling axis, and the one that makes costs hard to predict.</dd>
+</dl>
+  </section>
+
+  <section id="sources">
+    <h2><span class="sec-num">14</span>Sources</h2>
+<p>Every numbered marker in the text points here. Claims without a marker are exposition or
+widely-held practice, not sourced fact, and should be read as such.</p>
+
+<ol class="biblio">
+  <li id="r1">Sennrich, Haddow &amp; Birch. <em>Neural Machine Translation of Rare Words with
+    Subword Units</em>. ACL 2016, arXiv:1508.07909.
+    <a href="https://arxiv.org/abs/1508.07909" target="_blank" rel="noopener">arxiv.org/abs/1508.07909</a>
+    &mdash; the byte-pair encoding scheme adapted for tokenization.</li>
+
+  <li id="r2">Vaswani, Shazeer, Parmar, Uszkoreit, Jones, Gomez, Kaiser &amp; Polosukhin.
+    <em>Attention Is All You Need</em>. NeurIPS 2017, arXiv:1706.03762.
+    <a href="https://arxiv.org/abs/1706.03762" target="_blank" rel="noopener">arxiv.org/abs/1706.03762</a>
+    &mdash; scaled dot-product attention, multi-head attention, residual connections and the
+    original sinusoidal position encoding.</li>
+
+  <li id="r3">Su, Lu, Pan, Murtadha, Wen &amp; Liu. <em>RoFormer: Enhanced Transformer with
+    Rotary Position Embedding</em>. arXiv:2104.09864.
+    <a href="https://arxiv.org/abs/2104.09864" target="_blank" rel="noopener">arxiv.org/abs/2104.09864</a>
+    &mdash; RoPE, and why rotation makes the attention score a function of relative distance.</li>
+
+  <li id="r4">DeepSeek-AI. <em>DeepSeek-V3 Technical Report</em>. arXiv:2412.19437.
+    <a href="https://arxiv.org/abs/2412.19437" target="_blank" rel="noopener">arxiv.org/abs/2412.19437</a>
+    &mdash; 671B total with 37B activated per token; 256 routed experts plus one shared, eight
+    routed per token; 14.8T pretraining tokens; FP8 mixed-precision training; auxiliary-loss-free
+    load balancing; multi-head latent attention.</li>
+
+  <li id="r5">Mistral AI. <em>Cheaper, Better, Faster, Stronger</em>. 17 April 2024.
+    <a href="https://mistral.ai/news/mixtral-8x22b/" target="_blank" rel="noopener">mistral.ai/news/mixtral-8x22b/</a>
+    &mdash; Mixtral 8x22B at 39B active of 141B total, released under Apache 2.0.</li>
+
+  <li id="r6">Qwen Team. <em>Qwen3-Coder: Agentic Coding in the World</em>. 22 July 2025.
+    <a href="https://qwenlm.github.io/blog/qwen3-coder/" target="_blank" rel="noopener">qwenlm.github.io/blog/qwen3-coder/</a>
+    &mdash; Qwen3-Coder-480B-A35B: 480B total, 35B active, 256K native context extended to 1M by
+    extrapolation, Apache 2.0, and long-horizon reinforcement learning in post-training.</li>
+
+  <li id="r7">Ainslie, Lee-Thorp, de Jong, Zemlyanskiy, Lebr&oacute;n &amp; Sanghai.
+    <em>GQA: Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints</em>.
+    EMNLP 2023, arXiv:2305.13245.
+    <a href="https://arxiv.org/abs/2305.13245" target="_blank" rel="noopener">arxiv.org/abs/2305.13245</a>
+    &mdash; grouped-query attention and its quality/cache trade.</li>
+
+  <li id="r8">Modarressi, Deilamsalehy, Dernoncourt, Bui, Rossi, Yoon &amp; Sch&uuml;tze.
+    <em>NoLiMa: Long-Context Evaluation Beyond Literal Matching</em>. arXiv:2502.05167.
+    <a href="https://arxiv.org/abs/2502.05167" target="_blank" rel="noopener">arxiv.org/abs/2502.05167</a>
+    &mdash; GPT-4o falling from a 99.3% short-context baseline to 69.7% at 32K. Note that the
+    arXiv and ICML versions differ in model count and in how many fall below half their baseline;
+    the figures used here follow the arXiv version.</li>
+
+  <li id="r9">Hu, Shen, Wallis, Allen-Zhu, Li, Wang, Wang &amp; Chen. <em>LoRA: Low-Rank
+    Adaptation of Large Language Models</em>. ICLR 2022, arXiv:2106.09685.
+    <a href="https://arxiv.org/abs/2106.09685" target="_blank" rel="noopener">arxiv.org/abs/2106.09685</a>
+    &mdash; the low-rank reparameterisation and the argument that adaptation needs far less
+    capacity than the model itself.</li>
+
+  <li id="r10">Yao, Zhao, Yu, Du, Shafran, Narasimhan &amp; Cao. <em>ReAct: Synergizing Reasoning
+    and Acting in Language Models</em>. ICLR 2023, arXiv:2210.03629.
+    <a href="https://arxiv.org/abs/2210.03629" target="_blank" rel="noopener">arxiv.org/abs/2210.03629</a>
+    &mdash; the interleaved reason/act loop underlying most agent designs, and its effect on
+    hallucination relative to chain-of-thought alone.</li>
+</ol>
+  </section>
+
+
+  <footer class="colophon">
+    <p>Explained and published in the AI Library on 02 August 2026.</p>
+    <p>Written for this library rather than explained from an outside source. The draft was written with Claude and revised across three rounds of review; the numbers that carry an argument are cited, and the chapters that once carried uncited model comparisons were rebuilt without them.</p>
+    <p>Chapters 01–05 and 07 compute real arithmetic on seeded weights: the attention math, sampling, cache formulas, routing and LoRA figures are genuine; the learned parameters are not. Chapter 02's demo uses additive sinusoidal position rather than RoPE, because it can be toggled off for demonstration. Chapter 07's memory figures assume mixed-precision AdamW at roughly 16 bytes per trained parameter — a planning estimate, not a benchmark. Nothing on this page makes a network call.</p>
+    <p><a href="../index.html">← Back to the library</a></p>
+  </footer>
+
+</main>
+
+<script src="../assets/app.js"></script>
+<script src="../assets/fieldguide.js"></script>
+
+</body>
+</html>

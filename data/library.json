@@ -1,5 +1,27 @@
 [
   {
+    "slug": "llm-field-guide",
+    "title": "The Machinery of Language Models",
+    "type": "guide",
+    "authors": "Sarmisoft",
+    "venue": "AI Library",
+    "year": 2026,
+    "tags": [
+      "transformers",
+      "context-engineering",
+      "rag",
+      "agents",
+      "evaluation"
+    ],
+    "hook": "Twelve chapters from a character of text to a production agent, with the arithmetic exposed and eight working instruments in the page — the tokenizer, the attention heatmap, the samplers and the cache calculators all compute for real as you drag them.",
+    "read_minutes": 31,
+    "words": 6759,
+    "page": "pages/llm-field-guide.html",
+    "source_url": null,
+    "pdf": null,
+    "added": "2026-08-02"
+  },
+  {
     "slug": "context-engineering-survey",
     "title": "A Survey of Context Engineering for Large Language Models",
     "type": "paper",
