@@ -31,8 +31,20 @@
   --font-ui:   "Inter Tight", "Helvetica Neue", Helvetica, Arial, sans-serif;
   --font-mono: "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace;
 
-  --measure: 68ch;
-  --fig-bleed: 16rem;
+  /* In rem, not ch. `ch` is font-relative and a custom property resolves it on
+     the element that USES it, so 68ch was 578px on the grid track (17px body) and
+     620px on a p.lead (1.14rem) — one token, two lengths, and nothing computed
+     from it could line up. 36.125rem is the old 68ch at the body size. */
+  --measure: 36.125rem;
+  --fig-bleed: 6rem;
+  --fig-frame: 1rem;
+  --fig-border: 1px;
+  /* How far a figure's content sits inside its border box. Everything that has
+     to line up with the text column is offset by exactly this. */
+  --fig-inset: calc(var(--fig-frame) + var(--fig-border));
+  /* The content width shared by everything inside a section that carries a wide
+     figure — prose, images and captions alike. */
+  --wide-measure: calc(var(--measure) + var(--fig-bleed));
   --page-pad: 2rem;
   --radius: 10px;
 }
@@ -40,7 +52,7 @@
 /* Large screens can carry a longer line, but only once the left gutter is still
    wide enough for the sticky TOC — see the 1180px sidebar rule. */
 @media (min-width: 1340px) {
-  :root { --measure: 80ch; }
+  :root { --measure: 42.5rem; }   /* the old 80ch at the body size */
 }
 
 @media (prefers-color-scheme: dark) {
@@ -499,12 +511,18 @@ a:hover { color: var(--accent-ink); }
    RESOURCE PAGE
    ========================================================================== */
 
-/* The column gap is deliberately not set here: below 1180px the side tracks
+/* The middle track is min(), not minmax(0, …): with minmax the track is flexible,
+   so fr distribution against the sticky TOC's min-content floor settled it below
+   --measure (680px against a stated 80ch = 729px at 1440). Anything computing a
+   width from --measure was then wrong by the difference. min() keeps the track
+   definite and equal to the token, while still collapsing on narrow viewports.
+
+   The column gap is deliberately not set here: below 1180px the side tracks
    collapse to zero but the gaps do not, which stole 5rem of width from every
    narrow viewport. Only the sidebar layout needs a gutter, so only it sets one. */
 .doc {
   display: grid;
-  grid-template-columns: 1fr minmax(0, var(--measure)) 1fr;
+  grid-template-columns: 1fr min(var(--measure), 100%) 1fr;
   padding: 0 var(--page-pad);
 }
 .doc > * { grid-column: 2; }
@@ -750,12 +768,17 @@ blockquote cite {
 
 /* Figures */
 
+/* The card is pulled outward by exactly its own padding, so the figure's CONTENT
+   box — image and caption — coincides with the text column instead of sitting
+   --fig-frame inside it. The border then frames the prose rather than indenting
+   the picture. This is what keeps image, caption and paragraph flush at every
+   viewport, with no width tuned to a particular screen. */
 figure {
-  margin: 2.2rem 0;
+  margin: 2.2rem calc(var(--fig-inset) * -1);
   background: var(--bg-raised);
-  border: 1px solid var(--rule);
+  border: var(--fig-border) solid var(--rule);
   border-radius: var(--radius);
-  padding: 1rem;
+  padding: var(--fig-frame);
   box-shadow: var(--shadow);
 }
 figure img {
@@ -771,7 +794,9 @@ figcaption {
   line-height: 1.55;
   color: var(--ink-soft);
   margin-top: .9rem;
-  padding: 0 .2rem;
+  /* No horizontal padding: the caption has to start on the same vertical line as
+     the image above it and the paragraph below it. */
+  padding: 0;
 }
 figcaption .figlabel {
   font-weight: 700;
@@ -794,13 +819,17 @@ figcaption .figsrc {
    figure at measure width, which is a fine fallback. */
 @media (min-width: 1180px) {
   .doc section:has(> figure.wide, > .table-scroll.wide) { grid-column: 2 / 4; }
-  .doc section:has(> figure.wide, > .table-scroll.wide) > :not(figure.wide):not(.table-scroll.wide) {
-    max-width: var(--measure);
+  /* A wide figure does not outrun its prose — it takes the whole section with it.
+     Everything in the section gets the same content width, so the edges coincide
+     by construction at every viewport rather than by a constant tuned to one
+     screen. Figures ask for --fig-inset more because their border box is what is
+     being sized; the negative margin on `figure` cancels it straight back out. */
+  .doc section:has(> figure.wide, > .table-scroll.wide) > * {
+    max-width: var(--wide-measure);
   }
-  /* Bounded overhang, not an unbounded one: left to grow with the viewport, a
-     wide figure ends up hundreds of pixels past the prose and the text below it
-     reads as a gap. --fig-bleed keeps the overhang deliberate. */
-  figure.wide, .table-scroll.wide { max-width: calc(var(--measure) + var(--fig-bleed)); }
+  .doc section:has(> figure.wide, > .table-scroll.wide) > figure {
+    max-width: calc(var(--wide-measure) + var(--fig-inset) * 2);
+  }
 }
 
 /* Equations — no KaTeX. Unicode notation plus a plain-English reading. */
@@ -997,7 +1026,10 @@ a.cit {
 /* --- Mobile ----------------------------------------------------------- */
 
 @media (max-width: 720px) {
-  :root { --page-pad: .9rem; }
+  /* Matching the frame to the page padding is what makes a full-bleed figure's
+     content land on the same vertical line as the prose: the card reaches the
+     screen edge, its padding brings image and caption back to exactly --page-pad. */
+  :root { --page-pad: .9rem; --fig-frame: var(--page-pad); --fig-border: 0px; }
   body { font-size: 1.02rem; line-height: 1.66; }
   /* No tracks, no gaps — the phone gets the whole screen minus --page-pad. */
   .doc { display: block; }
@@ -1009,12 +1041,13 @@ a.cit {
   .controls__row { gap: .5rem; }
   .sort { flex: 1 1 100%; }
   .topbar__crumb { display: none; }
+  /* Side borders go to zero rather than `none` so --fig-inset drops with them and
+     the card lands flush on the screen edge instead of 1px past it. */
   figure {
-    padding: .6rem;
-    margin: 1.6rem calc(var(--page-pad) * -1);
+    padding-block: .6rem;
+    margin-block: 1.6rem;
     border-radius: 0;
-    border-left: none;
-    border-right: none;
+    border-block: 1px solid var(--rule);
   }
   .tldr { padding: 1.05rem 1.15rem; }
   .eq__math { font-size: .88rem; padding: .9rem 1rem; }
