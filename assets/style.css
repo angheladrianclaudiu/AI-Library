@@ -32,8 +32,15 @@
   --font-mono: "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace;
 
   --measure: 68ch;
+  --fig-bleed: 16rem;
   --page-pad: 2rem;
   --radius: 10px;
+}
+
+/* Large screens can carry a longer line, but only once the left gutter is still
+   wide enough for the sticky TOC — see the 1180px sidebar rule. */
+@media (min-width: 1340px) {
+  :root { --measure: 80ch; }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -492,10 +499,12 @@ a:hover { color: var(--accent-ink); }
    RESOURCE PAGE
    ========================================================================== */
 
+/* The column gap is deliberately not set here: below 1180px the side tracks
+   collapse to zero but the gaps do not, which stole 5rem of width from every
+   narrow viewport. Only the sidebar layout needs a gutter, so only it sets one. */
 .doc {
   display: grid;
   grid-template-columns: 1fr minmax(0, var(--measure)) 1fr;
-  column-gap: 2.5rem;
   padding: 0 var(--page-pad);
 }
 .doc > * { grid-column: 2; }
@@ -650,6 +659,7 @@ a:hover { color: var(--accent-ink); }
 
 /* Desktop: float the TOC into the left margin and keep it sticky. */
 @media (min-width: 1180px) {
+  .doc { column-gap: 2.5rem; }
   .toc {
     grid-column: 1;
     grid-row: span 40;
@@ -703,6 +713,17 @@ a:hover { color: var(--accent-ink); }
 
 .doc p { margin: 0 0 1.15rem; }
 .doc p.lead { font-size: 1.14rem; color: var(--ink-soft); }
+
+/* Justify body copy only — the hero meta, source links and colophon stay ragged.
+   Hyphenation is not optional here: justified serif in a phone-width column opens
+   rivers without it. It relies on <html lang="en">, which the template sets. */
+.doc section p, .doc section li, .tldr p {
+  text-align: justify;
+  text-justify: inter-word;
+  -webkit-hyphens: auto;
+  hyphens: auto;
+  overflow-wrap: break-word;
+}
 
 .doc ul, .doc ol { margin: 0 0 1.3rem; padding-left: 1.3rem; }
 .doc li { margin: .35rem 0; }
@@ -776,7 +797,10 @@ figcaption .figsrc {
   .doc section:has(> figure.wide, > .table-scroll.wide) > :not(figure.wide):not(.table-scroll.wide) {
     max-width: var(--measure);
   }
-  figure.wide, .table-scroll.wide { max-width: none; }
+  /* Bounded overhang, not an unbounded one: left to grow with the viewport, a
+     wide figure ends up hundreds of pixels past the prose and the text below it
+     reads as a gap. --fig-bleed keeps the overhang deliberate. */
+  figure.wide, .table-scroll.wide { max-width: calc(var(--measure) + var(--fig-bleed)); }
 }
 
 /* Equations — no KaTeX. Unicode notation plus a plain-English reading. */
@@ -973,8 +997,10 @@ a.cit {
 /* --- Mobile ----------------------------------------------------------- */
 
 @media (max-width: 720px) {
-  :root { --page-pad: 1.15rem; }
+  :root { --page-pad: .9rem; }
   body { font-size: 1.02rem; line-height: 1.66; }
+  /* No tracks, no gaps — the phone gets the whole screen minus --page-pad. */
+  .doc { display: block; }
   .lib-hero { padding: 2.5rem 0 1.5rem; }
   .hero { padding: 2.25rem 0 1.5rem; margin-bottom: 1.75rem; }
   .doc section { margin-bottom: 2.5rem; }
@@ -983,7 +1009,13 @@ a.cit {
   .controls__row { gap: .5rem; }
   .sort { flex: 1 1 100%; }
   .topbar__crumb { display: none; }
-  figure { padding: .6rem; margin: 1.6rem calc(var(--page-pad) * -.5); border-radius: 6px; }
+  figure {
+    padding: .6rem;
+    margin: 1.6rem calc(var(--page-pad) * -1);
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
   .tldr { padding: 1.05rem 1.15rem; }
   .eq__math { font-size: .88rem; padding: .9rem 1rem; }
 }
