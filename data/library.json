@@ -1,5 +1,27 @@
 [
   {
+    "slug": "context-engineering-survey",
+    "title": "A Survey of Context Engineering for Large Language Models",
+    "type": "paper",
+    "authors": "Lingrui Mei, Jiayu Yao, Yuyao Ge, Yiwei Wang, Baolong Bi, Yujun Cai, Jiazhi Liu, Mingyu Li, Zhong-Zhi Li, Duzhen Zhang, Chenlin Zhou, Jiayi Mao, Tianze Xia, Jiafeng Guo, Shenghua Liu",
+    "venue": "arXiv preprint",
+    "year": 2025,
+    "tags": [
+      "context-engineering",
+      "rag",
+      "agents",
+      "memory",
+      "survey"
+    ],
+    "hook": "Prompt engineering stopped describing what people actually build. This survey reads 1,400 papers to argue that retrieval, memory, tool use and multi-agent coordination are one discipline — and finds models understand context far better than they can generate it.",
+    "read_minutes": 24,
+    "words": 5182,
+    "page": "pages/context-engineering-survey.html",
+    "source_url": "https://arxiv.org/abs/2507.13334",
+    "pdf": null,
+    "added": "2026-08-02"
+  },
+  {
     "slug": "slopcodebench",
     "title": "SlopCodeBench: How Coding Agents Degrade Over Long-Horizon Tasks",
     "type": "paper",

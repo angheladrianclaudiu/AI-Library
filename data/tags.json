@@ -1,7 +1,12 @@
 [
+  "agents",
   "benchmarks",
   "code-quality",
   "coding-agents",
+  "context-engineering",
   "evaluation",
-  "long-horizon"
+  "long-horizon",
+  "memory",
+  "rag",
+  "survey"
 ]
