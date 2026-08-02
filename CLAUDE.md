@@ -32,6 +32,24 @@ python3 .claude/skills/add-resource/scripts/make_page.py inbox/my-slug.content.j
 `make_page.py` rebuilds `index.html` on its own. `rebuild_index.py` regenerates it
 standalone and is idempotent.
 
+## Reviewing a resource already published
+
+Use the `/review-resource` skill — the counterpart to `/add-resource`. It audits a
+live page against its original source and against the writing guide, using two
+independent adversarial passes (one for fidelity, one for craft) whose findings you
+then adjudicate yourself. Its `SKILL.md` is the process of record.
+
+Two of its scripts are useful on their own:
+
+```bash
+# rebuild a page's gitignored content JSON from the HTML it generated,
+# and prove the round-trip is byte-exact before editing anything
+python3 .claude/skills/review-resource/scripts/recover_content_json.py <slug> --verify
+
+# the browser assertions the checklist asks for on every change
+NO_PROXY='*' python3 .claude/skills/review-resource/scripts/verify_page.py <slug> --shots /tmp/shots
+```
+
 ## Conventions that matter
 
 - **Never hand-edit `index.html` or `pages/*.html`.** Both are generated. Edit the
