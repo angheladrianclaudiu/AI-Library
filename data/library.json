@@ -14,8 +14,8 @@
       "survey"
     ],
     "hook": "Prompt engineering stopped describing what people actually build. This survey reads 1,400 papers to argue that retrieval, memory, tool use and multi-agent coordination are one discipline — and finds models understand context far better than they can generate it.",
-    "read_minutes": 24,
-    "words": 5182,
+    "read_minutes": 25,
+    "words": 5508,
     "page": "pages/context-engineering-survey.html",
     "source_url": "https://arxiv.org/abs/2507.13334",
     "pdf": null,

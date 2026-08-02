@@ -45,7 +45,7 @@
     </p>
     <h1>A Survey of Context Engineering for Large Language Models</h1>
     <p class="hero__authors">Lingrui Mei, Jiayu Yao, Yuyao Ge, Yiwei Wang, Baolong Bi, Yujun Cai, Jiazhi Liu, Mingyu Li, Zhong-Zhi Li, Duzhen Zhang, Chenlin Zhou, Jiayi Mao, Tianze Xia, Jiafeng Guo, Shenghua Liu <span class="hero__venue">· arXiv preprint · 2025</span></p>
-    <p class="hero__meta">24 min read<span class="hero__tags">context-engineering · rag · agents · memory · survey</span></p>
+    <p class="hero__meta">25 min read<span class="hero__tags">context-engineering · rag · agents · memory · survey</span></p>
     <p class="srclinks"><a class="srclink" href="https://arxiv.org/abs/2507.13334" target="_blank" rel="noopener">↗ Original paper</a>
       <a class="srclink" href="https://arxiv.org/pdf/2507.13334" target="_blank" rel="noopener">↗ PDF</a>
       <a class="srclink" href="https://arxiv.org/html/2507.13334v2" target="_blank" rel="noopener">↗ HTML (v2)</a>
@@ -54,9 +54,9 @@
 
   <div class="tldr">
     <h2>In short</h2>
-    <p>Modern LLM systems don&#x27;t send a prompt; they assemble a context out of instructions, retrieved documents, tool definitions, memory and shared state. This survey formalises that assembly as &lt;strong&gt;context engineering&lt;/strong&gt;, defines it as an optimisation problem over context-building pipelines under a hard window constraint, and uses it to unify five research areas that had been growing separately.</p>
+    <p>Modern LLM systems don't send a prompt; they assemble a context out of instructions, retrieved documents, tool definitions, memory and shared state. This survey formalises that assembly as <strong>context engineering</strong>, defines it as an optimisation problem over context-building pipelines under a hard window constraint, and uses it to unify five research areas that had been growing separately.</p>
     <p>The organising structure is three foundational components — retrieval and generation, processing, management — feeding four system implementations: RAG, memory systems, tool-integrated reasoning, and multi-agent systems.</p>
-    <p>Its headline claim is an asymmetry: context engineering has made models very good at &lt;em&gt;understanding&lt;/em&gt; complex input, and has not made them correspondingly good at &lt;em&gt;producing&lt;/em&gt; complex long-form output. Worth noting that this is an impression formed from reading 1,400 papers, not something the authors measured.</p>
+    <p>Its headline claim is an asymmetry: context engineering has made models very good at <em>understanding</em> complex input, and has not made them correspondingly good at <em>producing</em> complex long-form output. Worth noting that this is an impression formed from reading 1,400 papers, not something the authors measured.</p>
   </div>
 
   <details class="toc" open>
@@ -83,12 +83,11 @@ difference between the two turns out to live entirely in what you put in front o
 <p>For the first few years after GPT-3, the craft of putting things in front of a model had
 a name — prompt engineering — and a shape. You wrote a string. You tried another string. You
 kept the one that worked. The whole discipline fit inside a text box, and the skill was
-essentially literary: phrasing, examples, tone, a few incantations like <em>let's think step
-by step</em> that turned out to be worth a surprising number of accuracy points.</p>
+essentially literary: phrasing, examples, tone, a few incantations like <em>let's think step by step</em> — the prompt that named <strong>chain-of-thought</strong> prompting, and that turned out to be worth a surprising number of accuracy points simply by making the model write its intermediate reasoning out before committing to an answer.</p>
 
 <p>That description stopped matching reality some time around 2023. The systems people
 actually ship now do not send a string. They assemble something: a system instruction written
-by one team, a handful of documents pulled from a vector database at request time, the JSON
+by one team, a handful of documents pulled at request time from a vector database, which indexes text by meaning rather than by keyword, the JSON
 signatures of a dozen tools the model is allowed to call, a summary of what the user said
 three sessions ago, the current state of a workflow that four other agents are also editing,
 and — somewhere at the end — the thing the user actually typed. Calling that a prompt is like
@@ -112,9 +111,7 @@ were reading about the same thing.</p>
 
 <h3>Why the window is the constraint</h3>
 
-<p>Underneath the conceptual argument sits a hard engineering one. The transformer's
-self-attention mechanism — the operation that lets every token in the input look at every
-other token — costs time and memory proportional to the <em>square</em> of the input length.
+<p>Underneath the conceptual argument sits a hard engineering one. A model does not read characters or words but <strong>tokens</strong>: short chunks of text, where a common word is usually one token and a rarer one splits into several. Every length on this page is counted in them. The transformer's self-attention mechanism, the operation that lets every token in the input look at every other token, costs time and memory proportional to the <em>square</em> of the input length.
 Double the context and you roughly quadruple the work. The survey cites the concrete shape of
 this: taking Mistral-7B from a 4,000-token input to a 128,000-token one requires about a
 122-fold increase in computation, and serving a single 128,000-token request to Llama 3.1 8B
@@ -178,7 +175,7 @@ that each maps onto an existing research area:</p>
 <div class="table-scroll"><table>
 <thead><tr><th>Component</th><th>What it holds</th><th>Which literature owns it</th></tr></thead>
 <tbody>
-<tr><td>c<sub>instr</sub></td><td>System instructions, rules, persona</td><td>Prompt engineering</td></tr>
+<tr><td>c<sub>instr</sub></td><td>System instructions and rules</td><td>Prompt engineering</td></tr>
 <tr><td>c<sub>know</sub></td><td>External knowledge, retrieved documents, graph facts</td><td>RAG, knowledge graphs</td></tr>
 <tr><td>c<sub>tools</sub></td><td>Definitions and signatures of callable tools</td><td>Function calling, tool-integrated reasoning</td></tr>
 <tr><td>c<sub>mem</sub></td><td>Persistent information from prior interactions</td><td>Memory systems</td></tr>
@@ -267,13 +264,12 @@ transforming it, and deciding what to keep.</p>
 
 <figure class="wide">
   <img src="../assets/images/context-engineering-survey/fig-p13-figure-3.webp" alt="A two-panel diagram. The left panel, labelled Context Engineering, shows four inputs: Long-Term Memory, Available Tools, User Prompt, and Retrieved Information. An arrow connects it to the right panel, Foundational Components, which contains three stacked rows: Context Retrieval and Generation, Context Processing, and Context Management, each holding three sub-boxes." width="1400" height="499">
-  <figcaption><span class="figlabel">Figure 3</span>The four raw inputs on the left are the c-components from the formal definition; the three rows on the right are the processing stages they pass through. Read left to right, this is the pipeline the equations describe.
+  <figcaption><span class="figlabel">Figure 3</span>The four raw inputs on the left are the c-components from the formal definition; the three rows on the right are the processing stages they pass through. Read left to right, this is the pipeline the equations describe. Figure numbers on this page are the paper's own, so they do not run in page order — Figure 2 is the timeline, further down.
   <span class="figsrc">Extracted from page 13 of the source PDF.</span></figcaption>
 </figure>
 
 <p><strong>Context Retrieval and Generation</strong> covers everything that produces context in
-the first place. This absorbs classical prompt engineering — zero-shot and few-shot prompting,
-chain-of-thought<a href="#r10" class="cit">10</a> and its descendants — alongside external
+the first place. This absorbs classical prompt engineering — zero-shot prompting (asking with no examples) and few-shot prompting (supplying a handful of worked examples first), chain-of-thought<a href="#r10" class="cit">10</a> and its descendants — alongside external
 knowledge retrieval and the assembly function A itself. The reasoning-structure work sits here,
 and the reported gains are large: zero-shot chain-of-thought lifting MultiArith accuracy from
 17.7% to 78.7%, Tree-of-Thoughts taking the Game of 24 from 4% to 74% by exploring a branching
@@ -283,18 +279,15 @@ reasoning steps rather than a strict tree.</p>
 
 <p><strong>Context Processing</strong> is where the quadratic-attention problem gets fought,
 and it is the most engineering-dense part of the survey. The approaches fall into recognisable
-families. Architectural replacements attack the O(n²) cost directly — state space models like
-Mamba achieve linear scaling with a fixed-size hidden state, and LongNet's dilated attention
+families. Architectural replacements attack that squared cost directly; O(n²) is the standard shorthand for it, work growing with the square of the input length n. State space models like Mamba achieve linear scaling with a fixed-size hidden state, and LongNet's dilated attention
 lets attention spans grow exponentially with distance. Position interpolation techniques such
 as YaRN and LongRoPE stretch a model trained on short sequences to longer ones by rescaling
 position indices rather than extrapolating into positions never seen in training; LongRoPE is
 reported to reach windows of about two million tokens. Systems-level optimisations keep the
 mathematics identical and make it cheaper: FlashAttention<a href="#r9" class="cit">9</a>
 reorganises the computation around the GPU memory hierarchy to get linear rather than quadratic
-memory traffic. And eviction strategies decide what to throw away — StreamingLLM<a href="#r11" class="cit">11</a> keeps a few
-early "attention sink" tokens plus a recent window and reports handling streams of up to four
-million tokens with a 22× speedup, while Heavy Hitter Oracle drops the KV-cache entries that
-receive little attention, reporting up to 29× throughput improvement.</p>
+memory traffic. And eviction strategies decide what to throw away — StreamingLLM<a href="#r11" class="cit">11</a> keeps a few early tokens that attention heads keep returning to whatever their content — "attention sinks" — plus a recent window and reports handling streams of up to four
+million tokens with a 22× speedup, while Heavy Hitter Oracle prunes the KV cache — the stored key and value vectors for tokens already processed, kept so the model need not recompute them — dropping the entries that receive little attention and reporting up to 29× throughput improvement.</p>
 
 <p>This component also holds self-refinement — Self-Refine, Reflexion, N-CRITICS — where the
 model critiques and revises its own output. The survey reports GPT-4 gaining roughly 20
@@ -340,8 +333,8 @@ RAG</em> moves the decision into the model: rather than always retrieving, the s
 about whether it needs to, what to ask for, and whether what came back was any good. Self-RAG
 does this with special reflection tokens the model emits to control its own retrieval.
 <em>Graph-enhanced RAG</em> changes the retrieval substrate from a pile of text chunks to a
-structured graph of entities and relations, which is what makes multi-hop questions tractable —
-GraphRAG, LightRAG, and HippoRAG (which runs Personalized PageRank over a knowledge graph) are
+structured graph of entities and relations, which is what makes multi-hop questions tractable, the ones whose answer needs two or three separate facts chained together —
+GraphRAG, LightRAG, and HippoRAG (which spreads relevance outward from the entities named in the query, using Personalized PageRank over a knowledge graph) are
 the representative systems.</p>
 
 <figure class="wide">
@@ -370,8 +363,7 @@ model into something that can act. The lineage the survey traces runs from
 Toolformer<a href="#r4" class="cit">4</a>, which learned to call APIs from self-supervised data,
 through ReAct<a href="#r5" class="cit">5</a>, whose thought–action–observation loop remains the
 template for most agent frameworks, to reinforcement-learned tool use. The strongest single
-result quoted is ReTool, which optimised code-interpreter use with RL and reached 67.0% on
-AIME2024 after 400 training steps, against 40.0% for a text-only RL baseline given considerably
+result quoted is ReTool, which optimised code-interpreter use with RL and reached 67.0% on AIME2024 (problems set by a hard American high-school mathematics competition) after 400 training steps, against 40.0% for a text-only RL baseline given considerably
 more training — evidence that modelling tool use explicitly inside the decision process beats
 treating it as text to be generated.</p>
 
@@ -382,13 +374,12 @@ treating it as text to be generated.</p>
 </figure>
 
 <p><strong>Multi-Agent Systems</strong> keep c<sub>state</sub> supplied across more than one
-model. The survey makes a nice historical observation here: this is not a new problem. Agent
+model. The survey makes a historical observation here worth keeping: this is not a new problem. Agent
 communication languages date to the Knowledge Sharing Effort of the early 1990s, and KQML and
 FIPA ACL already worked out the layered separation of content, message, and communication that
 today's protocols are rediscovering. The current ecosystem it describes is
-layered — MCP (which it quotes as being pitched as "USB-C for AI") standardises agent-to-tool
-access, ACP handles general message exchange, A2A covers peer-to-peer delegation between
-agents, and ANP extends addressing to the open internet using decentralised identifiers.</p>
+layered — MCP (which it quotes as being pitched as "USB-C for AI") standardises how an agent reaches its environment, ACP handles general message exchange, A2A covers peer-to-peer delegation between
+agents, and ANP extends addressing to the open internet using decentralised identifiers — name records that resolve without a central registry.</p>
 
 <figure class="wide">
   <img src="../assets/images/context-engineering-survey/fig-p08-figure-2.webp" alt="A timeline drawn as a tree growing upward from 2020 to 2025.07, with four coloured branches labelled Advanced RAG in green, Memory Systems in brown, Tool-Integrated Reasoning in purple, and Multi-Agent Systems in dark green. Each branch carries dozens of labelled system names, colour-coded as open or closed resource." width="1400" height="835">
@@ -461,12 +452,12 @@ remains very large.</p>
 <tbody>
 <tr><td>GAIA</td><td>General assistant tasks<a href="#r7" class="cit">7</a></td><td>GPT-4: 15%</td><td>92%</td></tr>
 <tr><td>GTA</td><td>Real human queries with implicit tool use</td><td>GPT-4: &lt;50%</td><td>92%</td></tr>
-<tr><td>WebArena</td><td>Web tasks across 137 sites</td><td>IBM CUGA: 61.7%</td><td>—</td></tr>
+<tr><td>WebArena</td><td>Multi-step tasks on self-hosted websites</td><td>IBM CUGA: 61.7%</td><td>—</td></tr>
 <tr><td>LongMemEval</td><td>Long-term memory over sessions</td><td>~30% accuracy loss over long interactions</td><td>—</td></tr>
 </tbody></table></div>
 
 <p>The GAIA figure is the one to sit with. On tasks designed to be conceptually simple for a
-person but to require several retrieval and tool steps, humans score 92% and GPT-4 scored 15%.
+person but to require several retrieval and tool steps, humans scored 92% and GPT-4 15%.
 That gap is not about knowledge or fluency, both of which the model has in abundance. It is
 about sustaining a multi-step process without losing the thread — which is to say, it is a
 context management failure, which is precisely the survey's point.</p>
@@ -515,9 +506,7 @@ similarity to the query systematically over-selects text that restates the query
 under-selects text that answers it. Conditioning on the query — asking what a document adds
 beyond what you already have — is a different objective and generally a better one.</p>
 
-<p><strong>Expect the failures to be at the seams.</strong> The evaluation section's most
-consistent message is that component-level benchmarks look much healthier than system-level
-ones. Retrieval works; tool calling works; memory works — and then GAIA scores 15%. If your
+<p><strong>Expect the failures to be at the seams.</strong> Read across the evaluation section, the pattern that stands out is that component-level results look much healthier than system-level ones — the survey separates the two kinds of assessment (§6.1.1 and §6.1.2) without itself drawing the comparison. Retrieval works; tool calling works; memory works — and then GAIA scores 15%. If your
 system disappoints despite each part testing well, that is the expected result rather than a
 surprise, and the survey's framing tells you where to look.</p>
 
@@ -582,6 +571,18 @@ than a substitute for it.</p>
     <h2><span class="sec-num">07</span>Glossary</h2>
 
 <dl class="glossary">
+<dt>Token</dt><dd>The unit a model actually reads and writes: a short chunk of text, where a
+common word is usually one token and a rarer one is split into several. Context lengths, costs
+and window limits are all counted in tokens.</dd>
+
+<dt>Chain-of-thought</dt><dd>Prompting a model to write out its intermediate reasoning before
+giving an answer, rather than answering directly. The zero-shot form is the bare instruction
+<em>let's think step by step</em>; the few-shot form supplies worked examples that reason aloud.</dd>
+
+<dt>Multi-hop question</dt><dd>A question whose answer requires chaining two or more separate
+facts, so no single retrieved passage contains it. The case that motivates graph-based
+retrieval.</dd>
+
 <dt>Context engineering</dt><dd>The systematic design and optimisation of the whole
 information payload sent to a language model, treated as an assembled structure rather than
 an authored string.</dd>
@@ -655,7 +656,7 @@ NeurIPS, 2023.</li>
 IO-Awareness</em>. NeurIPS, 2022.</li>
 <li id="r10">Jason Wei et al. <em>Chain-of-Thought Prompting Elicits Reasoning in Large
 Language Models</em>. NeurIPS, 2022.</li>
-<li id="r11">Guangzhi Xiao et al. <em>Efficient Streaming Language Models with Attention
+<li id="r11">Guangxuan Xiao et al. <em>Efficient Streaming Language Models with Attention
 Sinks</em>. ICLR, 2024.</li>
 </ol>
   </section>
