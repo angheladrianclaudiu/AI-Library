@@ -72,12 +72,27 @@ source that caused it.
       it inline so the page still works over `file://`.
 - [ ] **Cross-links between resources.** No way to say "this paper responds to that one".
       Add a `related` field to the content JSON, render it as a footer block, and make it
-      bidirectional at rebuild time.
+      bidirectional at rebuild time. The field guide now links to the context engineering
+      survey by hand, from prose and from its bibliography entry — which works, and is
+      invisible from the survey's side. A `related` field would make the link bidirectional
+      and would have prompted the connection rather than leaving it to be spotted in an audit.
+- [ ] **Nothing checks that a page cites anything.** `verify_page.py` catches dangling and
+      unused bibliography ids but not a section that makes sourceable claims and cites
+      nothing. The field guide's context-engineering chapter shipped in exactly that state
+      after unsourced claims were stripped and no replacement was added. A cheap heuristic:
+      warn when a section is over ~300 words, contains no `class="cit"`, and is not the
+      glossary or the sources list.
 - [ ] **Personal notes block.** A place for your own commentary on a resource, visually
       distinct from the explanation, so the page is not purely a summary.
 - [ ] **`make_page.py` does not validate citations.** It should fail when an
       `<a class="cit" href="#rN">` has no matching `<li id="rN">`, rather than leaving it
       to the checklist.
+- [ ] **SlopCodeBench's bibliography is uncited.** `verify_page.py` reports all five entries
+      (`r1`–`r5`) as cited by nothing: the page carries no `class="cit"` markers at all, so
+      its Sources section reads as a further-reading list rather than an apparatus. Either
+      wire the claims to it or rename the section to say what it is. Blocked on the
+      regenerate-from-a-fresh-clone problem below — the page cannot be edited without first
+      reconstructing its content JSON.
 - [ ] **Read-time estimate ignores figures and tables.** 220 wpm over body words only;
       a figure-heavy page reads longer than it claims.
 - [ ] **Re-ingesting a resource wipes its image folder.** `extract_pdf.py` clears
@@ -87,9 +102,32 @@ source that caused it.
 - [ ] **Figures sit on a white plate in dark mode.** Correct and legible, but a light
       rectangle in a dark page. Consider a per-figure `invert` opt-in for line charts
       where inversion actually works.
+- [ ] **The field guide's four practice chapters have no model outputs.** Prompting,
+      retrieval, tool loops and evals were written around live API calls, which a static site
+      cannot make. They currently ship as prompts, criteria and commentary with nothing
+      generated — honest, and weaker than the A/B contrast they were built for. The
+      `.fg-tr` / `.fg-tr__body` transcript components already exist in `style.css`, unused:
+      drop in real recorded outputs labelled with the model and the date they were captured.
+      Never synthesise them.
 - [ ] **Open Graph tags** so a shared link previews with the title and a figure.
 - [ ] **Accessibility pass.** Check contrast ratios against WCAG AA in both themes,
       keyboard operation of the tag chips, and focus order through the index controls.
+      Measured evidence now exists: `--ink-faint` is **4.08:1** on `--bg-raised` in light
+      mode, below the 4.5:1 requirement, and it is the colour of `.card__read`,
+      `.topbar__crumb`, `.hero__meta`, `.figsrc` and the figure captions' source line. Dark
+      mode passes at 4.79:1. The field guide's widgets sidestepped it by using `--ink-soft`,
+      but the token itself should be darkened — roughly `#6b747b` clears AA while staying
+      visibly lighter than `--ink-soft`. Check every existing page after changing it.
+- [ ] **Heatmap cells are mouse-only.** The attention grid in `fieldguide.js` paints
+      `div.fg__cell` with a `title` attribute, so the per-pair weights are unreachable by
+      keyboard and only summarised for a screen reader by the grid's `aria-label`. Either
+      make each row focusable with its weights in an accessible name, or offer the matrix as
+      a real `<table>` behind a toggle.
+- [ ] **Widget verification lives in the scratchpad.** The field guide ships 44 behavioural
+      assertions — sliders move readouts, the KV figure matches its formula, top-k
+      renormalises, both themes repaint — and none of them are in the repo, so the next
+      change to `fieldguide.js` has nothing to run. Promote the harness to
+      `.claude/skills/review-resource/scripts/verify_widgets.py` alongside `verify_page.py`.
 
 ## Process
 

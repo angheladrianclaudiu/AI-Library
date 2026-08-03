@@ -446,6 +446,7 @@ a:hover { color: var(--accent-ink); }
 }
 .badge--paper   { background: var(--accent-soft); color: var(--accent-ink); }
 .badge--article { background: var(--teal-soft);   color: var(--teal); }
+.badge--guide   { background: var(--fg-soft);     color: var(--fg-ink); }
 
 .card__read { color: var(--ink-faint); font-weight: 500; letter-spacing: .04em; }
 
@@ -1051,6 +1052,332 @@ a.cit {
   }
   .tldr { padding: 1.05rem 1.15rem; }
   .eq__math { font-size: .88rem; padding: .9rem 1rem; }
+}
+
+/* --- Field-guide instruments ------------------------------------------ *
+
+   Interactive widgets for a `type: "guide"` resource, driven by
+   assets/fieldguide.js. Kept in its own token block rather than folded into
+   :root above, so the widget palette stays separable from the site's.
+
+   Anything the JS needs to paint — heat ramps, token chips, expert cells — is
+   a custom property here rather than a literal in the script, because the JS
+   re-reads these on every theme flip. A colour hard-coded in JS is a colour
+   that survives into dark mode and blinds someone.                          */
+
+:root {
+  --fg-indigo:   #3a4a9e;
+  --fg-magenta:  #a52a63;
+  --fg-soft:     #e4e7f5;
+  --fg-ink:      #2f3d8c;
+  --fg-heat-lo:  #eef0ef;
+  --fg-heat-mid: #3e4c99;
+  --fg-heat-hi:  #9e1f53;
+  --fg-chip-sl:  30% 90%;      /* saturation + lightness for per-token hues */
+  --fg-chip-ink: #171a1c;
+  --fg-cell-off: #e0e5e3;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fg-indigo:   #8fa0e8;
+    --fg-magenta:  #ef7fa8;
+    --fg-soft:     #1e2333;
+    --fg-ink:      #a3b1ef;
+    --fg-heat-lo:  #191c21;
+    --fg-heat-mid: #4a5bb5;
+    --fg-heat-hi:  #d9457e;
+    --fg-chip-sl:  26% 26%;
+    --fg-chip-ink: #e8e6e1;
+    --fg-cell-off: #272c33;
+  }
+}
+:root[data-theme="light"] {
+  --fg-indigo:   #3a4a9e;
+  --fg-magenta:  #a52a63;
+  --fg-soft:     #e4e7f5;
+  --fg-ink:      #2f3d8c;
+  --fg-heat-lo:  #eef0ef;
+  --fg-heat-mid: #3e4c99;
+  --fg-heat-hi:  #9e1f53;
+  --fg-chip-sl:  30% 90%;
+  --fg-chip-ink: #171a1c;
+  --fg-cell-off: #e0e5e3;
+}
+:root[data-theme="dark"] {
+  --fg-indigo:   #8fa0e8;
+  --fg-magenta:  #ef7fa8;
+  --fg-soft:     #1e2333;
+  --fg-ink:      #a3b1ef;
+  --fg-heat-lo:  #191c21;
+  --fg-heat-mid: #4a5bb5;
+  --fg-heat-hi:  #d9457e;
+  --fg-chip-sl:  26% 26%;
+  --fg-chip-ink: #e8e6e1;
+  --fg-cell-off: #272c33;
+}
+
+/* Panel ---------------------------------------------------------------- */
+
+.fg {
+  background: var(--bg-raised);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 1.15rem 1.25rem 1.25rem;
+  margin: 1.75rem 0;
+  box-shadow: var(--shadow);
+}
+.fg__label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: .9rem;
+  flex-wrap: wrap;
+  font-family: var(--font-ui);
+  font-size: .68rem;
+  font-weight: 600;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-bottom: 1rem;
+}
+.fg__label em { font-style: normal; color: var(--teal); text-transform: none; letter-spacing: .02em; }
+.fg__note {
+  font-family: var(--font-ui);
+  font-size: .8rem;
+  line-height: 1.6;
+  color: var(--ink-soft);
+  margin: .85rem 0 0;
+  max-width: none;
+}
+
+/* Readout — the live numbers a widget reports ------------------------- */
+
+.fg__readout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem 1.6rem;
+  font-family: var(--font-mono);
+  font-size: .74rem;
+  border-top: 1px solid var(--rule);
+  margin-top: 1rem;
+  padding-top: .8rem;
+}
+.fg__readout div { display: flex; gap: .45rem; align-items: baseline; }
+.fg__readout b {
+  font-weight: 500;
+  color: var(--ink-soft);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  font-size: .66rem;
+}
+.fg__readout span { color: var(--fg-ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* Controls ------------------------------------------------------------- */
+
+.fg__ctl { margin-bottom: .85rem; }
+.fg__ctl > label,
+.fg__fieldlabel {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: .6rem;
+  font-family: var(--font-ui);
+  font-size: .78rem;
+  color: var(--ink-soft);
+  margin-bottom: .35rem;
+}
+.fg__ctl > label b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.fg input[type="range"] {
+  width: 100%;
+  height: 2px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--rule-strong);
+  cursor: pointer;
+}
+.fg input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--bg-raised);
+  border: 2px solid var(--fg-indigo);
+  cursor: pointer;
+}
+.fg input[type="range"]::-moz-range-thumb {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--bg-raised);
+  border: 2px solid var(--fg-indigo);
+  cursor: pointer;
+}
+.fg textarea {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: .82rem;
+  line-height: 1.6;
+  padding: .65rem .75rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--ink);
+  resize: vertical;
+}
+
+.fg__btn {
+  font-family: var(--font-ui);
+  font-size: .74rem;
+  font-weight: 600;
+  letter-spacing: .04em;
+  padding: .42rem .7rem;
+  border-radius: 6px;
+  border: 1px solid var(--rule-strong);
+  background: var(--bg);
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.fg__btn:hover { border-color: var(--fg-indigo); color: var(--ink); }
+.fg__btn[aria-pressed="true"] {
+  background: var(--fg-indigo);
+  border-color: var(--fg-indigo);
+  color: var(--bg-raised);
+}
+.fg__btn--go { background: var(--ink); border-color: var(--ink); color: var(--bg-raised); }
+.fg__btn--go:hover { background: var(--fg-magenta); border-color: var(--fg-magenta); color: #fff; }
+
+.fg__row  { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
+.fg__cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 1.4rem; }
+
+/* Tokens --------------------------------------------------------------- */
+
+.fg__tokens { line-height: 2.1; }
+.fg__tokbtn { font: inherit; background: none; border: 0; padding: 0; cursor: pointer; display: inline-block; vertical-align: top; }
+.fg__tok {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: .8rem;
+  padding: .12rem .35rem;
+  margin: .1rem;
+  border-radius: 4px;
+  border: 1px solid var(--rule);
+  white-space: pre;
+  color: var(--fg-chip-ink);
+}
+.fg__tokid {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: .6rem;
+  color: var(--ink-soft);
+  text-align: center;
+  margin-top: .1rem;
+}
+
+/* Heatmap, bars, grids -------------------------------------------------- */
+
+.fg__heat { display: grid; gap: 1px; }
+.fg__cell { aspect-ratio: 1; border-radius: 1px; }
+.fg__axl {
+  font-family: var(--font-mono);
+  font-size: .62rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fg__bar { height: 14px; border-radius: 2px; }
+.fg__barrow {
+  display: grid;
+  grid-template-columns: 7.5rem 1fr 4rem;
+  gap: .6rem;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: .72rem;
+  margin-bottom: .3rem;
+}
+.fg__barrow em { font-style: normal; color: var(--ink-soft); text-align: right; font-variant-numeric: tabular-nums; }
+.fg__egrid { display: grid; grid-template-columns: repeat(16, 1fr); gap: 3px; }
+.fg__ex { aspect-ratio: 1; border-radius: 1px; background: var(--fg-cell-off); }
+
+/* Two independent cost curves, drawn as separate series rather than stacked
+   — stacking them read as a sum, and the tall column overflowed its track. */
+.fg__chart { display: grid; gap: .5rem; align-items: end; height: 9rem; }
+.fg__chartcol { display: grid; grid-template-rows: 1fr auto; height: 100%; }
+.fg__chartbars { display: flex; align-items: flex-end; justify-content: center; gap: 2px; height: 100%; }
+.fg__chartbars i { display: block; width: 46%; border-radius: 2px 2px 0 0; min-height: 1px; }
+.fg__chartlbl { font-family: var(--font-mono); font-size: .6rem; color: var(--ink-soft); text-align: center; padding-top: .3rem; }
+.fg__key { font-family: var(--font-ui); font-size: .76rem; color: var(--ink-soft); margin: .7rem 0 0; max-width: none; }
+.fg__key i { display: inline-block; width: .6rem; height: .6rem; border-radius: 2px; margin-right: .3rem; }
+
+.fg__stack { display: flex; height: 2rem; border-radius: 6px; overflow: hidden; border: 1px solid var(--rule); background: var(--bg-sunken); }
+.fg__legend { display: flex; flex-wrap: wrap; gap: .3rem 1rem; font-family: var(--font-ui); font-size: .74rem; color: var(--ink-soft); margin-top: .55rem; }
+.fg__legend i { display: inline-block; width: .6rem; height: .6rem; border-radius: 2px; margin-right: .3rem; }
+
+.fg__out {
+  font-family: var(--font-mono);
+  font-size: .78rem;
+  line-height: 1.65;
+  background: var(--bg-sunken);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: .7rem .8rem;
+  color: var(--ink);
+  margin-top: .7rem;
+}
+
+/* Recorded transcripts -------------------------------------------------- */
+
+.fg-tr { border: 1px solid var(--rule); border-radius: var(--radius); background: var(--bg-raised); margin: .9rem 0; }
+.fg-tr__head {
+  display: flex;
+  justify-content: space-between;
+  gap: .8rem;
+  flex-wrap: wrap;
+  font-family: var(--font-ui);
+  font-size: .68rem;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  padding: .6rem .8rem;
+  border-bottom: 1px solid var(--rule);
+}
+.fg-tr__head em { font-style: normal; color: var(--teal); text-transform: none; letter-spacing: .02em; }
+.fg-tr__body { padding: .8rem; font-family: var(--font-mono); font-size: .78rem; line-height: 1.65; white-space: pre-wrap; color: var(--ink); }
+.fg-tr__body--pending {
+  margin: .7rem;
+  padding: .8rem;
+  border: 1px dashed var(--fg-magenta);
+  border-radius: 6px;
+  color: var(--fg-magenta);
+  font-family: var(--font-ui);
+  font-size: .78rem;
+  white-space: normal;
+}
+.fg-prompt {
+  border-left: 2px solid var(--teal);
+  padding: .4rem 0 .4rem .8rem;
+  margin: .7rem 0;
+  font-family: var(--font-mono);
+  font-size: .76rem;
+  line-height: 1.6;
+  color: var(--ink-soft);
+  white-space: pre-wrap;
+}
+.fg-prompt b {
+  display: block;
+  color: var(--teal);
+  font-family: var(--font-ui);
+  font-size: .64rem;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  margin-bottom: .2rem;
+}
+
+@media (max-width: 640px) {
+  .fg { padding: .9rem .85rem 1rem; }
+  .fg__barrow { grid-template-columns: 5.5rem 1fr 3.2rem; font-size: .68rem; }
+  .fg__egrid { grid-template-columns: repeat(8, 1fr); }
+  .fg__cols { gap: 1rem; }
 }
 
 /* --- Print ------------------------------------------------------------ */

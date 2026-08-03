@@ -135,6 +135,15 @@ schema; the short version:
 }
 ```
 
+`type` is `"paper"`, `"article"` or `"guide"`. Two optional fields exist for the
+third kind:
+
+- `"scripts": ["assets/foo.js"]` — page-scoped local JS, injected after
+  `app.js`. Remote URLs are rejected; the site's one external dependency is the
+  Google Fonts link and it stays that way.
+- `"colophon_note"` — replaces the footer's "read the original" line, which is
+  false for a guide. A `guide` gets a sensible default without setting this.
+
 Follow `references/writing-guide.md` — it covers the section skeleton, how to
 handle equations without a maths renderer, and the available components.
 

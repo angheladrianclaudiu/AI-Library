@@ -267,6 +267,104 @@ definition is the point.
 
 ---
 
+## Session 5 — The Machinery of Language Models (llm-field-guide)
+
+**Source:** no source. The first `type: "guide"` resource — original material written for this
+library rather than explained from an outside document. It arrived as a 1,322-line
+self-contained HTML file with its own design system, twelve chapters and eight interactive
+widgets, after two rounds of review against an earlier React version. No PDF, no extractor,
+no figures. 6,691 words, 30-minute read.
+
+**What worked first time:**
+
+- The whole extraction half of the pipeline was simply not used. `make_page.py` took the
+  content JSON and produced a correct page on the first run; the template's `sec-num`,
+  `details.toc` and progress bar meant the incoming file's bespoke masthead, chapter rail and
+  TOC could all be deleted rather than ported.
+- `a.cit` + `ol.biblio` needed no adaptation at all — the incoming file had already adopted
+  the house citation pattern, so ten references dropped straight in and `verify_page.py`
+  confirmed no dangling or unused ids.
+- Writing the content JSON from a Python builder script rather than by hand. 14 sections of
+  HTML with quoted attributes inside JSON strings would have been miserable to author
+  directly; a script with triple-quoted blocks and `json.dump` made it readable and let the
+  whole thing be regenerated after every fix.
+
+**What broke:**
+
+- **`verify_page.py` failed a figureless page.** `check(count > 0, "the page has no images at
+  all")` is right for a paper — zero images means the figure pass silently produced nothing —
+  and wrong for a guide, which can legitimately carry none. Now conditioned on the page
+  declaring `<figure>` elements, so it still catches the real failure.
+- **The demo vocabulary did not contain the demo sentences' words.** The stand-in merge table
+  shattered "board" into `b|o|a|rd` and "Routing decides" into `R|out|ing|d|e|c|i|d|es`. That
+  is a fair illustration of what happens to a rare word, and it destroyed the two chapters
+  built on it — attention and routing are about relationships between *words*, and single
+  letters have none. Nine words added to `VOCAB`; the orphan-absorbing guard in `tokenize()`
+  then merges the trailing fragment, so adding "approve" yields "approved" whole. Caught by
+  screenshot, not by any assertion — the widget tests all passed while the heatmap was
+  labelled with single letters.
+- **Two cost curves on one scale invented a fact.** The prefill/decode chart normalised both
+  series against prefill's maximum, so they crossed at 1024K and invited the reading that
+  prefill starts costing more than decode there. That crossing is an artifact of the units:
+  prefill FLOPs and decode FLOPs are not the same quantity. Each series is now scaled to its
+  own maximum, so the chart claims only curvature. The stacked-bar version this replaced had
+  a second bug — at the long end the two bars wanted 189% of a fixed-height flex column and
+  got shrunk, flattening the curve exactly where the argument needed it steepest.
+- **`--ink-faint` fails WCAG AA in light mode.** 4.08:1 on `--bg-raised`, against a 4.5:1
+  requirement, and it was the natural token for every small mono label in the widgets. Five
+  widget rules moved to `--ink-soft` (8.06:1). The token itself is untouched — it is used
+  across the existing pages and fixing it site-wide is the open accessibility item in TASKS.
+
+**Non-extraction findings:**
+
+- **A contrast script that walks up for a background must match the browser's string.** The
+  first version compared against `'rgba(0,0,0,0)'` while `getComputedStyle` returns
+  `'rgba(0, 0, 0, 0)'` with spaces, so the walk never ran and everything was measured against
+  black. It reported the badge at 2.17:1 when the real figure was 7.87:1, and it reported dark
+  mode as passing for the wrong reason. A measurement harness that cannot be wrong is worth
+  more than one that is merely convenient.
+- **Widget assertions and screenshots catch disjoint sets of bugs.** 44 behavioural checks —
+  probabilities summing to 100%, the cache matching its formula, entropy rising with
+  temperature, top-k renormalising — all passed on a page whose heatmap axes read
+  `b o a rd`. Conversely the screenshots would never have caught the LoRA 7/4 matrix ratio.
+  Both passes are needed; neither substitutes.
+- **Theme repainting needs a MutationObserver, not a media query.** The toggle sets
+  `data-theme` on `<html>`, which fires no `matchMedia` event. Watching the attribute *and*
+  the OS preference covers both routes, and re-reading the palette on each is enough — no
+  widget caches a colour beyond one render.
+- **A `guide` needed three small machine changes, all of which generalise:** a third `type`,
+  an `{{EXTRA_SCRIPTS}}` hook so a page can carry local JS without anyone hand-editing
+  generated HTML, and a `colophon_note` because the footer's standing "read the original for
+  the authors' own words" promise is simply false for original material.
+
+**Post-publication audit — two things the build passed and the page still got wrong:**
+
+- **A de-citing pass leaves a hole, and nothing warns you.** Stripping the unsourced claims out
+  of the context-engineering chapter took it from four assertions to none and left it the
+  thinnest substantive chapter on the page — 331 words against 656–912 for its neighbours.
+  Every check passed; word count per section is not something anything measures. The review
+  that removed the claims had already identified the replacement — a survey *already published
+  in this library* — and the port simply lost the note. Worth a habit: after removing a claim,
+  record what should go in its place, in the same pass.
+- **The demo corpus asserted invented commercial terms under a real company's byline.** The
+  retrieval widget shipped five policy documents opening "Sarmisoft accepts returns within 21
+  days of delivery…" — a 15% restocking fee, 400 RON free-shipping threshold, 24-month
+  warranty, bulk tiers — all invented, on a page bylined Sarmisoft, with the chapter saying
+  "nothing in any model's training data contains this company's restocking fee." The word
+  "stand-in" appeared once on the whole page and it was about the tokenizer. Fixed at source by
+  renaming the vendor to a plainly fictitious one rather than by disclosure alone: a caveat a
+  reader might skip is weaker than a name that cannot be mistaken. **Demo data that looks like
+  real business data needs a fictitious name, not a footnote** — especially when the byline
+  makes the attribution plausible.
+- **Interviewing the author beat guessing at their experience.** Four questions established
+  that nothing here is in production: no live prompts, no real corpus, no agents, no formal
+  eval set. That single answer determined which chapters could claim anything and turned a
+  vague worry about tone into a specific, fixable fidelity bug. It also ruled out an option
+  that seemed obviously good — publishing "we run no evals yet" as an honest note — because
+  the maturity of a company's internal practice is theirs to disclose, not the writer's.
+
+---
+
 ## Session template
 
 ```

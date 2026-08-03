@@ -149,3 +149,36 @@ or the last column ends up clipped inside the scroll box.
 
 Every `class="cit"` needs a matching `id` in the bibliography; `make_page.py`
 does not check this for you, so check it.
+
+### Interactive instruments (`type: "guide"` only)
+
+A guide can carry widgets driven by `assets/fieldguide.js`, listed in the
+content JSON's `scripts` array. The markup is plain HTML with agreed ids; the
+script wires the behaviour and bails out when a widget's root is absent.
+
+```html
+<div class="fg" id="fg-kv">
+  <div class="fg__label"><span>KV cache calculator</span><em id="fg-kv-headline">—</em></div>
+  <div class="fg__cols">
+    <div class="fg__ctl">
+      <label for="fg-kv-c"><span>context length</span><b id="fg-kv-c-v">128K tokens</b></label>
+      <input type="range" id="fg-kv-c" min="8" max="1024" step="8" value="128">
+    </div>
+  </div>
+  <p class="fg__note">A sentence about how to read it.</p>
+  <div class="fg__readout"><div><b>KV cache</b><span id="fg-kv-total">—</span></div></div>
+</div>
+```
+
+Two rules, both learned the hard way:
+
+**No colour literals anywhere.** Everything paintable is a `--fg-*` custom
+property in `style.css`, which the script re-reads on every theme change. A
+colour hard-coded in JS survives into dark mode and blinds someone.
+
+**Every control needs a real label.** `<label for>` on sliders, `<button>` with
+`aria-pressed` for toggles, `role="img"` plus a live `aria-label` on anything
+drawn as a grid. A `<span onclick>` is not a control.
+
+Prefer `--ink-soft` over `--ink-faint` for anything under about 12px:
+`--ink-faint` measures 4.08:1 on `--bg-raised` in light mode and fails AA.
