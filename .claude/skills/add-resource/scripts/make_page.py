@@ -22,6 +22,7 @@ Content JSON shape
   "source_url": "https://arxiv.org/abs/1706.03762",
   "pdf": "assets/pdf/attention-is-all-you-need.pdf",   # optional, only if < 1MB
   "scripts": ["assets/fieldguide.js"],   # optional, local paths only
+  "colophon_lead": "Republished … on {{ADDED}}.",   # optional, see below
   "sections": [
     {"id": "the-problem", "title": "The problem", "html": "<p>…</p>"}
   ]
@@ -61,6 +62,11 @@ REQUIRED = ("slug", "title", "sections", "hook")
 # What a resource can be. "guide" is for something written for this library
 # rather than explained from an outside source, so it has no original to link.
 TYPE_LABELS = {"paper": "Paper", "article": "Article", "guide": "Guide"}
+
+# The colophon's opening line. "Explained" is true of a page written from a
+# source and false of one that reproduces it, so a resource can override this;
+# {{ADDED}} still resolves inside whatever it supplies.
+COLOPHON_LEAD_DEFAULT = "Explained and published in the AI Library on {{ADDED}}."
 
 # The colophon's standing promise — true for anything explained from a source,
 # and wrong for a guide, which has no original to send the reader back to.
@@ -106,11 +112,19 @@ def build_toc(sections: list[dict]) -> str:
 
 
 def build_sections(sections: list[dict]) -> str:
+    """Position number above each section title, unless the section sets `num`.
+
+    Ordinal position is right when section names carry no number of their own.
+    When they do — a source whose sections *are* "Factor 1", "Factor 2" — the
+    ordinal disagrees with the name and the reader trusts neither, so the
+    section can supply the label it should print instead.
+    """
     parts = []
     for i, sec in enumerate(sections, start=1):
+        num = sec.get("num", f"{i:02d}")
         parts.append(
             f'  <section id="{esc(sec["id"])}">\n'
-            f'    <h2><span class="sec-num">{i:02d}</span>{esc(sec["title"])}</h2>\n'
+            f'    <h2><span class="sec-num">{esc(num)}</span>{esc(sec["title"])}</h2>\n'
             f'{sec["html"].rstrip()}\n'
             f"  </section>\n"
         )
@@ -243,12 +257,16 @@ def main() -> int:
         "{{TLDR}}": as_paragraphs(content.get("tldr", content["hook"])),
         "{{TOC}}": build_toc(sections),
         "{{SECTIONS}}": build_sections(sections),
-        "{{ADDED}}": date.fromisoformat(added).strftime("%d %B %Y"),
-        "{{EXTRA_SCRIPTS}}": "\n".join(scripts),
+        # Ordered before {{ADDED}} so a supplied lead can still use that token.
+        "{{COLOPHON_LEAD}}": as_paragraphs(
+            content.get("colophon_lead") or COLOPHON_LEAD_DEFAULT
+        ),
         "{{COLOPHON_NOTE}}": as_paragraphs(
             content.get("colophon_note")
             or COLOPHON_NOTES.get(rtype, COLOPHON_NOTES["default"])
         ),
+        "{{ADDED}}": date.fromisoformat(added).strftime("%d %B %Y"),
+        "{{EXTRA_SCRIPTS}}": "\n".join(scripts),
     }
     for needle, value in replacements.items():
         page = page.replace(needle, value)

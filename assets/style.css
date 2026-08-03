@@ -730,6 +730,17 @@ a:hover { color: var(--accent-ink); }
   margin: 2.2rem 0 .8rem;
 }
 
+/* A fourth level, for a source whose own structure genuinely nests two deep
+   inside a section. Sits below h3 without shrinking under the body size. */
+.doc h4 {
+  font-size: 1rem;
+  line-height: 1.4;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--ink-soft);
+  margin: 1.8rem 0 .6rem;
+}
+
 .doc p { margin: 0 0 1.15rem; }
 .doc p.lead { font-size: 1.14rem; color: var(--ink-soft); }
 
