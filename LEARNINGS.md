@@ -365,6 +365,87 @@ no figures. 6,691 words, 30-minute read.
 
 ---
 
+## Session 6 — 12-Factor Agents (github.com/humanlayer/12-factor-agents)
+
+**The article branch's first real end-to-end run**, and the first page that reproduces a
+source instead of explaining it. Both firsts produced findings.
+
+**Source:** a self-contained offline render of a GitHub repo's markdown — README, a history
+essay, twelve factor files and an appendix — concatenated into 15 `<section class="doc">`
+blocks with custom CSS, a sidebar, a progress bar and copy buttons. 128 KB, ~8,400 words
+including code. Pinned by its own footer to commit `d20c728`. **Every one of its 71 images
+was a remote hotlink**; the "offline edition" claim in its masthead covers the text only.
+
+**What worked first time:**
+
+- `trafilatura` handled the custom single-`<main>` layout without help — 52 KB of clean
+  text, complete through factor 13, no navigation leakage. The `--file` path had never been
+  run against a real saved page (`TASKS.md`) and it works.
+- `--no-images` plus a hand-written fetch list. Worth doing deliberately every time an
+  article's images are worth having: see the cap below.
+- The whole mechanical transform. Converting the render's chrome (`.codeblock` wrappers,
+  `<details>`, badge rows) into library markup with BeautifulSoup was reliable; the failures
+  were all in *my* traversal, not in the parsing.
+
+**What broke:**
+
+- **`extract_article.py:178` caps downloads at `candidates[:40]`, and the cap is a
+  truncation, not a filter.** The first ~40 unique URLs here were 5 shields.io badges, 12
+  visual-nav thumbnails and 14 contributor avatars — so the cap would have spent itself
+  entirely on junk and silently dropped the factor 9–12 diagrams. Nothing would have
+  reported the loss. Logged in `TASKS.md`.
+- **Pillow saves frame 0 of an animated GIF, which for a build-up animation is a near-empty
+  title frame.** Five of this source's load-bearing figures are GIFs. **Taking the *last*
+  frame gives the complete diagram** — verified by eye on all four kept ones, and it worked
+  every time. Use `img.seek(img.n_frames - 1)`. Two of the five had explicit static
+  counterparts in the repo (`190-…-static.png`, `029-…-high-level.png`); prefer those.
+- **I assumed the numbered images (`110`…`1c0`) were decorative title cards and planned to
+  drop all twelve. They are not.** Each is a substantive diagram — factor 3's is the
+  standard-vs-custom context comparison, factor 8's is the switch-statement control flow.
+  They double as nav thumbnails, which is what misled me. *Open the image before deciding
+  it is decoration* — the same lesson sessions 1–3 learned about crops, in a new disguise.
+- **A `<p>` holding two images loses the second** if you replace the whole paragraph on the
+  first one. Replace the `<p>` only when it wraps exactly one image. Cost: one figure,
+  caught only by diffing the manifest against the images actually referenced.
+- **`clean()` returns a soup whose only child is the `<section>` wrapper.** Iterating the
+  soup's children therefore yields one node, not the body nodes — so a "slice between two
+  headings" helper silently returned the entire section. Symptom was five duplicated
+  figures, not an error. The same wrapper then survived into the output as a nested
+  `<section>` with a stripped id; the browser check caught it as blank ids in the section
+  list.
+- **Not every `![…](…)` in this render is a defect to strip.** Eight sat inside `<details>`
+  blocks (genuinely broken markdown), but one was inside an **HTML comment** — the author
+  had deliberately commented factor 3's header diagram out. Honour the comment-out; strip
+  comments rather than pattern-matching the markdown.
+- **`as_paragraphs()` escapes any string that does not start with `<`.** A `colophon_note`
+  written as prose-with-a-link printed its own `<a href=…>` markup on the page. Open such
+  fields with a tag.
+
+**Non-extraction findings:**
+
+- **`python3` does not exist on Windows**, only `python`. Every command in `CLAUDE.md` and
+  `SKILL.md` is written `python3`. Nothing is broken, but the copy-paste fails.
+- **`recover_content_json.py --verify` fails on all three pre-existing pages at HEAD**, and
+  the script itself says why: the recovered JSON is wrong, not the page. The committed HTML
+  has a hard-wrapped colophon paragraph and an unescaped apostrophe that a rebuild
+  normalises. Worth knowing before using it as a regression gate — diff against the *HEAD
+  baseline diff*, not against zero.
+- **Reproducing a CC BY-SA source changes what the page owes.** An explanation written from
+  a source is a new work; a faithful copy is a redistribution, so share-alike actually
+  binds. That is why this page carries the licence in three places (an opening callout, all
+  32 `figsrc` credits, and the sources section) rather than the usual single source link.
+- **Two colophon defaults were false for a reproduction**, and both were hardcoded:
+  "Explained and published in the AI Library" in the template, and the ordinal section
+  number, which ran one ahead of section titles that carry their own numbers ("13" above
+  "Factor 12"). Added `colophon_lead` and per-section `num`; both default to the previous
+  behaviour, verified byte-identical against a rebuild of `slopcodebench`.
+- **`--ink-faint` fails AA in light mode, measured.** `.figsrc` and `.callout__label` come
+  out at **4.08:1**, exactly the figure `writing-guide.md:184` warns about. Dark mode is
+  fine (4.79:1). This is every page, not this one; the new `.doc h4` uses `--ink-soft`
+  (7.73 light, 8.77 dark) on that advice.
+
+---
+
 ## Session template
 
 ```

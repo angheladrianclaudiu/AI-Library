@@ -54,15 +54,31 @@ source that caused it.
 
 ## Article branch
 
-- [ ] **Never run end to end.** `extract_article.py` is written and its blocked-egress path
-      is exercised, but no article has been ingested in full, because this environment
-      cannot reach the open web. First real run should be from a machine with normal
-      access — expect to find bugs in image resolution and main-content extraction.
+- [x] **Never run end to end.** Done in session 6 (12-factor-agents), from a saved `.html`
+      with `--url`. `trafilatura` handled a custom single-`<main>` layout cleanly and the
+      text came across complete; the bugs were all in the image path, below.
+- [ ] **The 40-image cap is a truncation, not a filter.** `extract_article.py:178` takes
+      `candidates[:40]`. On the 12-factor source the first 40 unique URLs were shields.io
+      badges, nav thumbnails and contributor avatars, so the cap would have spent itself on
+      junk and silently dropped the real diagrams. Filter first — drop known badge hosts
+      (`shields.io`), tracking pixels (`scarf.sh`), avatars (`avatars.githubusercontent.com`)
+      and anything below `MIN_IMAGE_SIDE` — *then* apply a cap, and report what the cap cut.
+- [ ] **Animated GIFs need a policy.** Pillow saves frame 0, which for a build-up animation
+      is a near-empty title frame. Session 6 found the *last* frame is reliably the complete
+      diagram, and that repos often ship an explicit `-static.png` counterpart. Encode both:
+      prefer a static sibling, else `seek(n_frames - 1)`, and record `frames` in the figures
+      JSON so the skill knows to look.
 - [ ] **Hotlinked images are a latent broken link.** When a download is blocked the figure
       is recorded with `hotlinked: true` and the page references the remote URL. Decide
-      whether to allow that at all, or to always require a locally saved copy.
+      whether to allow that at all, or to always require a locally saved copy. Session 6
+      argues for never: `CLAUDE.md` permits exactly one external dependency.
 - [ ] **Saved-HTML path needs a real test** against a "Webpage, Complete" save, which
-      rewrites image paths to a local `_files/` directory.
+      rewrites image paths to a local `_files/` directory. Session 6 used a single-file
+      render with absolute remote URLs, so this variant is still untested.
+- [ ] **Nothing warns when a downloaded figure goes unused.** Session 6 caught three only by
+      diffing the manifest against the images the page actually referenced, and caught a
+      *lost* figure the same way. `make_page.py` could compare `assets/images/<slug>/`
+      against the `src`s in the built page and print both lists.
 
 ## Site and HTML
 
@@ -114,8 +130,9 @@ source that caused it.
       keyboard operation of the tag chips, and focus order through the index controls.
       Measured evidence now exists: `--ink-faint` is **4.08:1** on `--bg-raised` in light
       mode, below the 4.5:1 requirement, and it is the colour of `.card__read`,
-      `.topbar__crumb`, `.hero__meta`, `.figsrc` and the figure captions' source line. Dark
-      mode passes at 4.79:1. The field guide's widgets sidestepped it by using `--ink-soft`,
+      `.topbar__crumb`, `.hero__meta`, `.figsrc`, `.callout__label` and the figure captions'
+      source line. Dark mode passes at 4.79:1. Re-measured independently in session 6 on a
+      fourth page, same numbers. The field guide's widgets sidestepped it by using `--ink-soft`,
       but the token itself should be darkened — roughly `#6b747b` clears AA while staying
       visibly lighter than `--ink-soft`. Check every existing page after changing it.
 - [ ] **Heatmap cells are mouse-only.** The attention grid in `fieldguide.js` paints
@@ -146,8 +163,20 @@ source that caused it.
       page it builds. The source PDF still stays out of history; only the JSON needs to
       survive.
 
+- [ ] **`recover_content_json.py --verify` fails on every existing page.** Not a page
+      defect — the script says so itself — but it means the one tool offered as a
+      pre-edit safety gate reports failure by default, which trains you to ignore it. Two
+      causes, both cosmetic: the committed HTML hard-wraps the colophon paragraph where a
+      rebuild emits one line, and it carries a literal `'` where a rebuild escapes `&#x27;`.
+      Either normalise the committed pages once, or have the verifier compare on normalised
+      whitespace and entities.
+- [ ] **`python3` does not exist on Windows.** Every command in `CLAUDE.md`, `SKILL.md` and
+      the script docstrings is written `python3`; on Windows only `python` resolves, and the
+      shim prints a Microsoft Store advert instead of failing usefully. Either write plain
+      `python`, or say once at the top that Windows users should substitute it.
 - [ ] **Tag vocabulary needs curating.** `data/tags.json` grows monotonically and nothing
-      ever merges near-duplicates. Revisit once there are ~20 resources.
+      ever merges near-duplicates. Revisit once there are ~20 resources. Session 6 added
+      `prompting` and `production`, taking it to 13.
 - [ ] **Batch ingest.** One resource per run is right for quality, but a queue mode for
       several PDFs at once would save repeated setup.
 - [ ] **Enable GitHub Pages** — Settings → Pages → Deploy from a branch → `main` / root.
