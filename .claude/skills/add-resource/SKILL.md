@@ -144,6 +144,17 @@ third kind:
 - `"colophon_note"` — replaces the footer's "read the original" line, which is
   false for a guide. A `guide` gets a sensible default without setting this.
 
+Two more apply to any type, and exist because a page that **reproduces** a
+source rather than explaining it makes the defaults wrong:
+
+- `"colophon_lead"` — replaces the footer's opening "Explained and published in
+  the AI Library on …". `{{ADDED}}` still resolves inside whatever you supply.
+  Set it whenever "explained" would be a lie.
+- `"num"` on a section — the label printed above the section title, instead of
+  its ordinal position. Use it when the sections carry numbers of their own
+  ("Factor 1", "Factor 2"), where an ordinal runs one ahead of the name and the
+  reader ends up trusting neither.
+
 Follow `references/writing-guide.md` — it covers the section skeleton, how to
 handle equations without a maths renderer, and the available components.
 

@@ -9,6 +9,14 @@ explained from an outside source — so it has no original to link and no figure
 extract. A guide may carry interactive widgets via the content JSON's `scripts`
 field; see `assets/fieldguide.js` and the writing guide's "Interactive instruments".
 
+One page is an exception to the "explanation" rule. **`12-factor-agents` is a faithful
+reproduction**, not a summary: the author's own words and code, section by section,
+restyled into this library's format and redistributed under the source's CC BY-SA 4.0
+licence. Do not "fix" it into an explanation. Its licence obligations are why the page
+carries attribution in three places — an opening callout, every `figsrc`, and the sources
+section — and why its `colophon_lead` does not claim the page was explained. A reproduction
+sets `type: "article"`; there is no separate type for it.
+
 **The site is the product; `.claude/skills/add-resource/` is the machine that grows it.**
 Changes to the machine should be justified by something that went wrong building a page.
 
