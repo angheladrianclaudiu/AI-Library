@@ -72,7 +72,16 @@ source that caused it.
       it inline so the page still works over `file://`.
 - [ ] **Cross-links between resources.** No way to say "this paper responds to that one".
       Add a `related` field to the content JSON, render it as a footer block, and make it
-      bidirectional at rebuild time.
+      bidirectional at rebuild time. The field guide now links to the context engineering
+      survey by hand, from prose and from its bibliography entry — which works, and is
+      invisible from the survey's side. A `related` field would make the link bidirectional
+      and would have prompted the connection rather than leaving it to be spotted in an audit.
+- [ ] **Nothing checks that a page cites anything.** `verify_page.py` catches dangling and
+      unused bibliography ids but not a section that makes sourceable claims and cites
+      nothing. The field guide's context-engineering chapter shipped in exactly that state
+      after unsourced claims were stripped and no replacement was added. A cheap heuristic:
+      warn when a section is over ~300 words, contains no `class="cit"`, and is not the
+      glossary or the sources list.
 - [ ] **Personal notes block.** A place for your own commentary on a resource, visually
       distinct from the explanation, so the page is not purely a summary.
 - [ ] **`make_page.py` does not validate citations.** It should fail when an

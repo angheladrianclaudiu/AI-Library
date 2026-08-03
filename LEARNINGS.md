@@ -337,6 +337,32 @@ no figures. 6,691 words, 30-minute read.
   generated HTML, and a `colophon_note` because the footer's standing "read the original for
   the authors' own words" promise is simply false for original material.
 
+**Post-publication audit — two things the build passed and the page still got wrong:**
+
+- **A de-citing pass leaves a hole, and nothing warns you.** Stripping the unsourced claims out
+  of the context-engineering chapter took it from four assertions to none and left it the
+  thinnest substantive chapter on the page — 331 words against 656–912 for its neighbours.
+  Every check passed; word count per section is not something anything measures. The review
+  that removed the claims had already identified the replacement — a survey *already published
+  in this library* — and the port simply lost the note. Worth a habit: after removing a claim,
+  record what should go in its place, in the same pass.
+- **The demo corpus asserted invented commercial terms under a real company's byline.** The
+  retrieval widget shipped five policy documents opening "Sarmisoft accepts returns within 21
+  days of delivery…" — a 15% restocking fee, 400 RON free-shipping threshold, 24-month
+  warranty, bulk tiers — all invented, on a page bylined Sarmisoft, with the chapter saying
+  "nothing in any model's training data contains this company's restocking fee." The word
+  "stand-in" appeared once on the whole page and it was about the tokenizer. Fixed at source by
+  renaming the vendor to a plainly fictitious one rather than by disclosure alone: a caveat a
+  reader might skip is weaker than a name that cannot be mistaken. **Demo data that looks like
+  real business data needs a fictitious name, not a footnote** — especially when the byline
+  makes the attribution plausible.
+- **Interviewing the author beat guessing at their experience.** Four questions established
+  that nothing here is in production: no live prompts, no real corpus, no agents, no formal
+  eval set. That single answer determined which chapters could claim anything and turned a
+  vague worry about tone into a specific, fixable fidelity bug. It also ruled out an option
+  that seemed obviously good — publishing "we run no evals yet" as an honest note — because
+  the maturity of a company's internal practice is theirs to disclose, not the writer's.
+
 ---
 
 ## Session template

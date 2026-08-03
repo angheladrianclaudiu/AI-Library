@@ -45,7 +45,7 @@
     </p>
     <h1>The Machinery of Language Models</h1>
     <p class="hero__authors">Sarmisoft <span class="hero__venue">· AI Library · 2026</span></p>
-    <p class="hero__meta">31 min read<span class="hero__tags">transformers · context-engineering · rag · agents · evaluation</span></p>
+    <p class="hero__meta">33 min read<span class="hero__tags">transformers · context-engineering · rag · agents · evaluation</span></p>
     <p class="srclinks"><span class="srclink">Written for this library</span></p>
   </div>
 
@@ -742,8 +742,11 @@ world-class expert&rdquo; helps only insofar as it narrows the register. What re
 boring: state the audience, state the format, state the success criteria, supply the facts, and
 show an example of what right looks like.</p>
 
-<p>Four pairs follow. Each pair asks for the same thing twice, and the difference between them is
-the entire argument. Read them as specifications and ask what the vague one leaves open.</p>
+<p>Four pairs follow. Each asks for the same thing twice, and the difference between them is the
+entire argument. They are written for this chapter rather than lifted from a production system,
+and there are no model outputs printed beside them on purpose &mdash; a static page cannot call a
+model, and inventing an output to prove a point about invented outputs would be its own joke.
+Read them as specifications instead, and ask what the vague one leaves open.</p>
 
 <div class="fg">
   <div class="fg__label"><span>Pair 1 &mdash; specificity</span></div>
@@ -807,8 +810,12 @@ is one component of it, not the other way round.</p>
 
 <p>The shift happened because agents broke the single-call assumption. A prompt steers one call.
 An agent strings many together, against inputs nobody saw at authoring time, accumulating tool
-output as it goes. The window stops being something you write and becomes something you
-budget.</p>
+output as it goes. The window stops being something you write and becomes something you budget.
+The clearest survey of the area reads 1,400 papers to argue that retrieval, memory, tool use and
+multi-agent coordination are not four separate techniques but one discipline, and that prompting
+sits inside it rather than above it.<a href="#r11" class="cit">11</a> This library has a
+<a href="context-engineering-survey.html">plain-English explanation of that survey</a>, which goes
+considerably deeper than this chapter does.</p>
 
 
 <div class="fg" id="fg-budget">
@@ -855,9 +862,27 @@ budget.</p>
 </div>
 
 
+<h3>The asymmetry worth knowing about</h3>
+
+<p>That survey's headline finding is a gap it claims to see across the whole literature: models
+have become remarkably good at <em>understanding</em> complicated context, and have not become
+correspondingly good at <em>producing</em> complicated output.<a href="#r11" class="cit">11</a>
+Feed a model a hundred pages and it will answer questions about them well. Ask it to write
+something long, structured and internally consistent and the quality falls off in a way that more
+context does not fix.</p>
+
+<p>If that holds, it reorders the work. Effort spent perfecting what goes into the window pays
+back well, because comprehension is the strong side. Effort spent expecting a single call to emit
+a large, coherent artifact fights the weak side, and the fix is structural &mdash; decompose the
+output, generate it in pieces, and verify each piece &mdash; rather than a better prompt. It is
+also a claim assembled from reading rather than measured in one experiment, so treat it as a
+well-argued position and not a benchmark result.</p>
+
 <h3>The failure modes have names</h3>
 
-<p><strong>Poisoning</strong> &mdash; a wrong fact enters early and is treated as ground truth by
+<p>These four are practitioner vocabulary rather than a formal taxonomy &mdash; useful for
+naming what went wrong in a post-mortem, not something with a citation behind it.
+<strong>Poisoning</strong> &mdash; a wrong fact enters early and is treated as ground truth by
 every later turn, so small initial errors compound rather than wash out.
 <strong>Distraction</strong> &mdash; retrieved chunks that match on keywords but not intent crowd
 out the ones that mattered. <strong>Clash</strong> &mdash; two retrieved documents contradict each
@@ -888,9 +913,9 @@ the shelf.</p>
 
 <p>The pipeline is short and every stage can ruin you: chunk the corpus, embed each chunk into a
 vector, store it in an index, embed the query the same way, take the nearest neighbours,
-optionally rerank with a stronger model, then assemble. Chunking is the most underrated stage
-&mdash; split mid-clause and you retrieve a fragment that is technically relevant and practically
-useless.</p>
+optionally rerank with a stronger model, then assemble.<a href="#r11" class="cit">11</a> Chunking
+is the most underrated stage &mdash; split mid-clause and you retrieve a fragment that is
+technically relevant and practically useless.</p>
 
 <p>The panel below runs the retrieval stage for real, scoring a five-document policy corpus
 against your question in the page. Nothing is generated: what you are watching is the part that
@@ -918,17 +943,27 @@ decides what a model would have been given.</p>
 </div>
 
 
+<div class="callout callout--caveat">
+  <span class="callout__label">These policies are invented</span>
+  <p>Northwind Instruments does not exist, and its five documents were written for this
+  demonstration. The 21-day window, the 15% restocking fee, the shipping thresholds and the
+  warranty terms are not any real vendor's published policy &mdash; including the one whose
+  byline is on this page. They are here because retrieval only becomes legible when the corpus
+  is specific, and specific invented text is safer than specific real text.</p>
+</div>
+
 <p>The reason this stage carries so much weight is that the ungrounded answer is usually the more
-dangerous one: fluent, confident, plausible and invented. Nothing in any model's training data
-contains this company's restocking fee. A generic answer about returns will sound entirely
-reasonable and will get the 21-day window, the 15% fee and the custom-configuration exclusion
-wrong, because it has no way to know them.</p>
+dangerous one: fluent, confident, plausible and invented. A restocking fee is exactly the kind of
+fact no model can hold &mdash; it lives in one company's documents and was never in anyone's
+training data. Ask without retrieval and you will still get an answer about returns, and it will
+sound entirely reasonable while getting the window, the fee and the custom-configuration
+exclusion wrong, because there was nothing to get them right from.</p>
 
 <div class="callout callout--caveat">
   <span class="callout__label">Where the real difficulty lives</span>
   <p>Term matching, used here, fails on paraphrase; pure vector search fails on exact identifiers
-  like order numbers or SKUs. Production systems run hybrid retrieval and then rerank. And
-  retrieval is increasingly on-demand rather than pre-loaded, which is the bridge to the next
+  like order numbers or SKUs. Production systems run hybrid retrieval and then rerank.<a href="#r11" class="cit">11</a>
+  And retrieval is increasingly on-demand rather than pre-loaded, which is the bridge to the next
   chapter.</p>
 </div>
   </section>
@@ -950,6 +985,12 @@ itself<a href="#r10" class="cit">10</a>.</p>
 request rather than prose; your runtime executes it and appends the output as a new message. The
 model never touches your database &mdash; it writes a request that your code decides whether to
 honour. Every tool definition also costs context, permanently, on every call.</p>
+
+<p>The direction of travel is toward pulling context in on demand rather than pre-loading it, and
+toward standardising how a model reaches an external system in the first place, so that tools,
+memory and retrieval stop being bespoke per application.<a href="#r11" class="cit">11</a> That is
+the same move as retrieval in chapter 10, generalised: the window holds a way to ask rather than
+the answer.</p>
 
 <div class="fg">
   <div class="fg__label"><span>The shape of one iteration</span><em>message blocks, not a recorded run</em></div>
@@ -993,8 +1034,10 @@ subjective goes to a judge, human or model.</p>
 outputs that look confident. It is a fast proxy, not a verdict &mdash; calibrate it against human
 labels on a subset before trusting it.</p>
 
-<p>Three cases, of the kind a real set is built from. Note that the criteria do the work: each one
-is checkable by someone who has never seen the system.</p>
+<p>Three cases of the kind a real set is built from, written for this chapter rather than taken
+from one. Note that the criteria do the work: each is checkable by someone who has never seen the
+system, which is the property that makes a case worth keeping. E1 borrows the invented returns
+policy from chapter 10.</p>
 
 <div class="table-scroll">
   <table>
@@ -1161,12 +1204,21 @@ widely-held practice, not sourced fact, and should be read as such.</p>
     <a href="https://arxiv.org/abs/2210.03629" target="_blank" rel="noopener">arxiv.org/abs/2210.03629</a>
     &mdash; the interleaved reason/act loop underlying most agent designs, and its effect on
     hallucination relative to chain-of-thought alone.</li>
+
+  <li id="r11">Mei, Yao, Ge, Wang, Bi, Cai, Liu, Li, Li, Zhang, Zhou, Mao, Xia, Guo &amp; Liu.
+    <em>A Survey of Context Engineering for Large Language Models</em>. arXiv:2507.13334.
+    <a href="https://arxiv.org/abs/2507.13334" target="_blank" rel="noopener">arxiv.org/abs/2507.13334</a>
+    &mdash; source for context engineering as a single discipline spanning retrieval, memory,
+    tool use and multi-agent coordination, for the RAG pipeline and hybrid retrieval, and for the
+    comprehension&ndash;generation asymmetry. Explained at length elsewhere in this library:
+    <a href="context-engineering-survey.html">A Survey of Context Engineering for Large Language
+    Models</a>.</li>
 </ol>
   </section>
 
 
   <footer class="colophon">
-    <p>Explained and published in the AI Library on 02 August 2026.</p>
+    <p>Explained and published in the AI Library on 03 August 2026.</p>
     <p>Written for this library rather than explained from an outside source. The draft was written with Claude and revised across three rounds of review; the numbers that carry an argument are cited, and the chapters that once carried uncited model comparisons were rebuilt without them.</p>
     <p>Chapters 01–05 and 07 compute real arithmetic on seeded weights: the attention math, sampling, cache formulas, routing and LoRA figures are genuine; the learned parameters are not. Chapter 02's demo uses additive sinusoidal position rather than RoPE, because it can be toggled off for demonstration. Chapter 07's memory figures assume mixed-precision AdamW at roughly 16 bytes per trained parameter — a planning estimate, not a benchmark. Nothing on this page makes a network call.</p>
     <p><a href="../index.html">← Back to the library</a></p>

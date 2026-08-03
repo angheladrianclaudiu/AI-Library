@@ -879,8 +879,12 @@
     var host = $("#fg-rag");
     if (!host) return;
 
+    /* An invented vendor with invented terms. The name is deliberately
+       fictitious: this page carries a real company's byline, and a reader who
+       took these numbers for its actual published policy would have every
+       reason to. Nothing here is anyone's real returns policy. */
     var CORPUS = [
-      { id: "POL-04", title: "Return window", body: "Sarmisoft accepts returns within 21 days of delivery. Items opened but undamaged incur a 15% restocking fee. Custom-configured units are final sale and cannot be returned under any circumstance." },
+      { id: "POL-04", title: "Return window", body: "Northwind Instruments accepts returns within 21 days of delivery. Items opened but undamaged incur a 15% restocking fee. Custom-configured units are final sale and cannot be returned under any circumstance." },
       { id: "POL-09", title: "Shipping tiers", body: "Standard shipping is 4-6 business days and free above 400 RON. Express is 1-2 business days at a flat 65 RON. We do not ship to PO boxes or to addresses outside the EU." },
       { id: "POL-12", title: "Warranty", body: "Hardware carries a 24-month warranty covering manufacturing defects. Water damage, unauthorised repair, and cosmetic wear are excluded. Warranty claims require the original order number." },
       { id: "POL-17", title: "Bulk orders", body: "Orders above 20 units qualify for tiered pricing: 8% off at 20 units, 14% at 50, 20% at 100. Bulk orders ship on a 3-week lead time and require 50% payment upfront." },
