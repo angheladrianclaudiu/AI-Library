@@ -1,0 +1,1330 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>12-Factor Agents: Principles for Building Reliable LLM Applications — AI Library</title>
+<meta name="description" content="Most products calling themselves AI agents are mostly deterministic code with model calls in the right places — and the ones that work stay that way. Thirteen principles for the parts you should own yourself: the prompt, the context window, the control flow, and how small you keep the agent.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#129504;</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem("ail-theme");
+      if (t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t);
+    } catch (e) {}
+  })();
+</script>
+</head>
+<body>
+
+<div id="progress"></div>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="topbar">
+  <a class="topbar__home" href="../index.html">
+    <span class="topbar__mark" aria-hidden="true">AI</span>
+    <span>AI Library</span>
+  </a>
+  <span class="topbar__crumb">12-Factor Agents: Principles for Building Reliable LLM Applications</span>
+  <span class="topbar__spacer"></span>
+  <button class="theme-toggle" type="button" aria-label="Toggle dark and light theme">
+    <span class="icon-light" aria-hidden="true">☾</span>
+    <span class="icon-dark" aria-hidden="true">☀</span>
+  </button>
+</header>
+
+<main id="main" class="doc">
+
+  <div class="hero">
+    <p class="hero__kicker">
+      <span class="badge badge--article">Article</span>
+    </p>
+    <h1>12-Factor Agents: Principles for Building Reliable LLM Applications</h1>
+    <p class="hero__authors">Dex Horthy and contributors <span class="hero__venue">· HumanLayer · 2025</span></p>
+    <p class="hero__meta">40 min read<span class="hero__tags">agents · context-engineering · prompting · production</span></p>
+    <p class="srclinks"><a class="srclink" href="https://github.com/humanlayer/12-factor-agents" target="_blank" rel="noopener">↗ Original article</a>
+      <a class="srclink" href="https://www.youtube.com/watch?v=8kMaTybvDUw" target="_blank" rel="noopener">↗ Conference talk (17m)</a>
+      <a class="srclink" href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">↗ CC BY-SA 4.0</a></p>
+  </div>
+
+  <div class="tldr">
+    <h2>In short</h2>
+    <p>The autonomous loop — here's a prompt, here's a bag of tools, keep going until you're done — reaches about 70&ndash;80% quality and stops. Past ten or twenty turns the context window grows long enough that the model gets lost and repeats the same broken approach. Horthy's claim, from talking to roughly a hundred technical founders, is that everyone hits this and most of them start over.</p>
+    <p>What works instead is small agents — three to ten steps — embedded in pipelines that are otherwise ordinary deterministic code. The twelve factors (plus a thirteenth in the appendix) are the engineering practices that make that possible, and each can be adopted on its own without rewriting anything.</p>
+    <p>This page reproduces the guide in full rather than summarising it.</p>
+  </div>
+
+  <details class="toc" open>
+    <summary>Contents</summary>
+    <ol>
+      <li><a href="#the-problem">How we got here</a></li>
+      <li><a href="#factor-1">Factor 1 — Natural Language to Tool Calls</a></li>
+      <li><a href="#factor-2">Factor 2 — Own Your Prompts</a></li>
+      <li><a href="#factor-3">Factor 3 — Own Your Context Window</a></li>
+      <li><a href="#factor-4">Factor 4 — Tools Are Just Structured Outputs</a></li>
+      <li><a href="#factor-5">Factor 5 — Unify Execution State and Business State</a></li>
+      <li><a href="#factor-6">Factor 6 — Launch/Pause/Resume with Simple APIs</a></li>
+      <li><a href="#factor-7">Factor 7 — Contact Humans with Tool Calls</a></li>
+      <li><a href="#factor-8">Factor 8 — Own Your Control Flow</a></li>
+      <li><a href="#factor-9">Factor 9 — Compact Errors into Context Window</a></li>
+      <li><a href="#factor-10">Factor 10 — Small, Focused Agents</a></li>
+      <li><a href="#factor-11">Factor 11 — Trigger from Anywhere</a></li>
+      <li><a href="#factor-12">Factor 12 — Make Your Agent a Stateless Reducer</a></li>
+      <li><a href="#factor-13">Factor 13 — Pre-fetch All the Context You Might Need</a></li>
+      <li><a href="#glossary">Glossary</a></li>
+      <li><a href="#sources">Sources</a></li>
+    </ol>
+  </details>
+
+  <section id="the-problem">
+    <h2><span class="sec-num">00</span>How we got here</h2>
+<div class="callout callout--note">
+  <span class="callout__label">About this page</span>
+  <p>Everything below is <strong>Dex Horthy's own text</strong>, from the
+  <a href="https://github.com/humanlayer/12-factor-agents" target="_blank" rel="noopener"><em>12-factor agents</em> repository</a>
+  he maintains with contributors at HumanLayer. It is reproduced here in full rather than
+  summarised, under the
+  <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">Creative Commons Attribution-ShareAlike 4.0</a>
+  licence the repository publishes it under; this page carries that same licence. Code samples
+  are <a href="https://www.apache.org/licenses/LICENSE-2.0" target="_blank" rel="noopener">Apache 2.0</a>.
+  Only the packaging is this library's: the figures were downloaded and captioned, the thirteen
+  factors were given a section and a table of contents each, and a glossary was added at the end.
+  Read the <a href="https://github.com/humanlayer/12-factor-agents" target="_blank" rel="noopener">original repository</a> for the
+  living version — it is still being edited, and this copy is pinned to commit
+  <code>d20c728</code>.</p>
+</div>
+
+<p><em>In the spirit of <a href="https://12factor.net/" rel="noopener" target="_blank">12 Factor Apps</a></em>.  <em>The source for this project is public at https://github.com/humanlayer/12-factor-agents, and I welcome your feedback and contributions. Let's figure this out together!</em></p>
+<div class="callout callout--note"><span class="callout__label">Tip</span>
+<p>Missed the AI Engineer World's Fair? 
+Catch the talk here</p>
+<p>Looking for Context Engineering? <a href="#factor-3">Jump straight to factor 3</a></p>
+<p>Want to contribute to <code>npx/uvx create-12-factor-agent</code> - check out <a href="https://github.com/humanlayer/12-factor-agents/discussions/61" rel="noopener" target="_blank">the discussion thread</a></p>
+</div>
+<p>Hi, I'm Dex. I've been <a href="https://youtu.be/8bIHcttkOTE" rel="noopener" target="_blank">hacking</a> on <a href="https://theouterloop.substack.com" rel="noopener" target="_blank">AI agents</a> for <a href="https://humanlayer.dev" rel="noopener" target="_blank">a while</a>. </p>
+<p><strong>I've tried every agent framework out there</strong>, from the plug-and-play crew/langchains to the "minimalist" smolagents of the world to the "production grade" langraph, griptape, etc. </p>
+<p><strong>I've talked to a lot of really strong founders</strong>, in and out of YC, who are all building really impressive things with AI. Most of them are rolling the stack themselves. I don't see a lot of frameworks in production customer-facing agents.</p>
+<p><strong>I've been surprised to find</strong> that most of the products out there billing themselves as "AI Agents" are not all that agentic. A lot of them are mostly deterministic code, with LLM steps sprinkled in at just the right points to make the experience truly magical.</p>
+<p>Agents, at least the good ones, don't follow the <a href="https://www.anthropic.com/engineering/building-effective-agents#agents" rel="noopener" target="_blank">"here's your prompt, here's a bag of tools, loop until you hit the goal"</a> pattern. Rather, they are comprised of mostly just software. </p>
+<p>So, I set out to answer:</p>
+<blockquote>
+<p><strong>What are the principles we can use to build LLM-powered software that is actually good enough to put in the hands of production customers?</strong></p>
+</blockquote>
+<p>Welcome to 12-factor agents. As every Chicago mayor since Daley has consistently plastered all over the city's major airports, we're glad you're here.</p>
+<p><em>Special thanks to <a href="https://github.com/iantbutler01" rel="noopener" target="_blank">@iantbutler01</a>, <a href="https://github.com/tnm" rel="noopener" target="_blank">@tnm</a>, <a href="https://www.github.com/hellovai" rel="noopener" target="_blank">@hellovai</a>, <a href="https://www.github.com/stantonk" rel="noopener" target="_blank">@stantonk</a>, <a href="https://www.github.com/balanceiskey" rel="noopener" target="_blank">@balanceiskey</a>, <a href="https://www.github.com/AdjectiveAllison" rel="noopener" target="_blank">@AdjectiveAllison</a>, <a href="https://www.github.com/pfbyjy" rel="noopener" target="_blank">@pfbyjy</a>, <a href="https://www.github.com/a-churchill" rel="noopener" target="_blank">@a-churchill</a>, and the SF MLOps community for early feedback on this guide.</em></p>
+<h3>The Short Version: The 12 Factors</h3>
+<p>Even if LLMs <a href="#factor-10">continue to get exponentially more powerful</a>, there will be core engineering techniques that make LLM-powered software more reliable, more scalable, and easier to maintain.</p>
+<h3>Why 12-factor agents?</h3>
+<p>At the end of the day, this approach just doesn't work as well as we want it to.</p>
+<p>In building HumanLayer, I've talked to at least 100 SaaS builders (mostly technical founders) looking to make their existing product more agentic. The journey usually goes something like:</p>
+<ol>
+<li>Decide you want to build an agent</li>
+<li>Product design, UX mapping, what problems to solve</li>
+<li>Want to move fast, so grab $FRAMEWORK and <em>get to building</em></li>
+<li>Get to 70-80% quality bar </li>
+<li>Realize that 80% isn't good enough for most customer-facing features</li>
+<li>Realize that getting past 80% requires reverse-engineering the framework, prompts, flow, etc.</li>
+<li>Start over from scratch</li>
+</ol>
+<h4>Design Patterns for great LLM applications</h4>
+<p>After digging through hundreds of AI libriaries and working with dozens of founders, my instinct is this:</p>
+<ol>
+<li>There are some core things that make agents great</li>
+<li>Going all in on a framework and building what is essentially a greenfield rewrite may be counter-productive</li>
+<li>There are some core principles that make agents great, and you will get most/all of them if you pull in a framework</li>
+<li>BUT, the fastest way I've seen for builders to get high-quality AI software in the hands of customers is to take small, modular concepts from agent building, and incorporate them into their existing product</li>
+<li>These modular concepts from agents can be defined and applied by most skilled software engineers, even if they don't have an AI background</li>
+</ol>
+<blockquote>
+<p>The fastest way I've seen for builders to get good AI software in the hands of customers is to take small, modular concepts from agent building, and incorporate them into their existing product</p>
+</blockquote>
+<h3>The longer version: how we got here</h3>
+<h4>You don't have to listen to me</h4>
+<p>Whether you're new to agents or an ornery old veteran like me, I'm going to try to convince you to throw out most of what you think about AI Agents, take a step back, and rethink them from first principles. (spoiler alert if you didn't catch the OpenAI responses launch a few weeks back, but pushing MORE agent logic behind an API ain't it)</p>
+<h3>Agents are software, and a brief history thereof</h3>
+<p>let's talk about how we got here</p>
+<h4>60 years ago</h4>
+<p>We're gonna talk a lot about Directed Graphs (DGs) and their Acyclic friends, DAGs. I'll start by pointing out that...well...software is a directed graph. There's a reason we used to represent programs as flow charts.</p>
+<figure class="wide">
+<img alt="A simple flow chart: an event node leads through call api, kickoff pipeline and update DB to a goal node, each step joined by a single arrow." height="829" src="../assets/images/12-factor-agents/software-dag.webp" width="1400"/>
+<figcaption><span class="figlabel">Software</span>The starting premise of the whole argument: software has always been a directed graph. Every step is coded, and so is every edge between steps.
+  <span class="figsrc">From the <em>12-factor agents</em> repository by Dex Horthy / HumanLayer, licensed <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener" target="_blank">CC BY-SA 4.0</a>.</span></figcaption>
+</figure>
+<h4>20 years ago</h4>
+<p>Around 20 years ago, we started to see DAG orchestrators become popular. We're talking classics like <a href="https://airflow.apache.org/" rel="noopener" target="_blank">Airflow</a>, <a href="https://www.prefect.io/" rel="noopener" target="_blank">Prefect</a>, some predecessors, and some newer ones like (<a href="https://dagster.io/" rel="noopener" target="_blank">dagster</a>, <a href="https://www.inngest.com/" rel="noopener" target="_blank">inggest</a>, <a href="https://www.windmill.dev/" rel="noopener" target="_blank">windmill</a>). These followed the same graph pattern, with the added benefit of observability, modularity, retries, administration, etc.</p>
+<figure class="wide">
+<img alt="The same chain of steps, now drawn inside a labelled container representing an orchestration framework, with retry and observability annotations." height="889" src="../assets/images/12-factor-agents/dag-orchestrators.webp" width="1400"/>
+<figcaption><span class="figlabel">DAG orchestrators</span>What Airflow, Prefect and their successors added: the same graph, plus retries, observability and administration. The shape did not change.
+  <span class="figsrc">From the <em>12-factor agents</em> repository by Dex Horthy / HumanLayer, licensed <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener" target="_blank">CC BY-SA 4.0</a>.</span></figcaption>
+</figure>
+<h4>10-15 years ago</h4>
+<p>When ML models started to get good enough to be useful, we started to see DAGs with ML models sprinkled in. You might imagine steps like "summarize the text in this column into a new column" or "classify the support issues by severity or sentiment".</p>
+<figure class="wide">
+<img alt="A directed graph of deterministic steps in which one node is highlighted as a machine-learning model performing a classification." height="690" src="../assets/images/12-factor-agents/dags-with-ml.webp" width="1400"/>
+<figcaption><span class="figlabel">DAGs with ML</span>The 10-to-15-year-old pattern: a model dropped into one node of an otherwise deterministic pipeline. Horthy's point is that this, not the autonomous loop, is what most shipped software still looks like.
+  <span class="figsrc">From the <em>12-factor agents</em> repository by Dex Horthy / HumanLayer, licensed <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener" target="_blank">CC BY-SA 4.0</a>.</span></figcaption>
+</figure>
+<p>But at the end of the day, it's still mostly the same good old deterministic software.</p>
+<h4>The promise of agents</h4>
+<p>I'm not the first <a href="https://youtu.be/Dc99-zTMyMg?si=bcT0hIwWij2mR-40&amp;t=73" rel="noopener" target="_blank">person to say this</a>, but my biggest takeaway when I started learning about agents, was that you get to throw the DAG away. Instead of software engineers coding each step and edge case, you can give the agent a goal and a set of transitions:</p>
+<figure class="wide">
+<img alt="A cloud-like node labelled with a goal, surrounded by a set of available transitions but with no fixed path drawn between them." height="682" src="../assets/images/12-factor-agents/agent-dag.webp" width="1400"/>
+<figcaption><span class="figlabel">The promise</span>The promise that made agents exciting: hand the model a goal and a set of transitions, and stop coding the path between them.
+  <span class="figsrc">From the <em>12-factor agents</em> repository by Dex Horthy / HumanLayer, licensed <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener" target="_blank">CC BY-SA 4.0</a>.</span></figcaption>
+</figure>
+<p>And let the LLM make decisions in real time to figure out the path</p>
+<figure class="wide">
+<img alt="The same goal-and-transitions diagram, now with arrows drawn through it showing one path the model chose at run time." height="607" src="../assets/images/12-factor-agents/agent-dag-lines.webp" width="1400"/>
+<figcaption><span class="figlabel">The promise, continued</span>And let the model draw the edges at run time. The rest of the guide is about why this does not hold up past ten or twenty turns.
+  <span class="figsrc">From the <em>12-factor agents</em> repository by Dex Horthy / HumanLayer, licensed <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener" target="_blank">CC BY-SA 4.0</a>.</span></figcaption>
+</figure>
+<p>The promise here is that you write less software, you just give the LLM the "edges" of the graph and let it figure out the nodes. You can recover from errors, you can write less code, and you may find that LLMs find novel solutions to problems.</p>
+<h4>Agents as loops</h4>
+<p>Put another way, you've got this loop consisting of 3 steps:</p>
+<ol>
+<li>LLM determines the next step in the workflow, outputting structured json ("tool calling")</li>
+<li>Deterministic code executes the tool call</li>
+<li>The result is appended to the context window </li>
+<li>repeat until the next step is determined to be "done"</li>
+</ol>
+<pre><code class="language-python">initial_event = {"message": "..."}
+context = [initial_event]
+while True:
+  next_step = await llm.determine_next_step(context)
+  context.append(next_step)
+
+  if (next_step.intent === "done"):
+    return next_step.final_answer
+
+  result = await execute_step(next_step)
+  context.append(result)
+</code></pre>
+<p>Our initial context is just the starting event (maybe a user message, maybe a cron fired, maybe a webhook, etc),
+and we ask the llm to choose the next step (tool) or to determine that we're done.</p>
+<p>Here's a multi-step example:</p>
+<figure class="wide">
+<img alt="A loop diagram. An event enters a determine-next-step node, which fans out to call api, kickoff pipeline and update DB, each returning a result that feeds back into the node; a growing context list accumulates on the left and a final answer exits on the right." height="663" src="../assets/images/12-factor-agents/agent-loop.webp" width="1400"/>
+<figcaption><span class="figlabel">The agent loop</span>The three-step loop in full: the model picks a step, deterministic code runs it, the result is appended to the context, repeat until done. The column on the left is the context window growing with every turn — which is exactly the thing that later breaks.
+  <span class="figsrc">From the <em>12-factor agents</em> repository by Dex Horthy / HumanLayer, licensed <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener" target="_blank">CC BY-SA 4.0</a>. Final frame of the source animation.</span></figcaption>
+</figure>
+<p>And the "materialized" DAG that was generated would look something like:</p>
+<figure class="wide">
+<img alt="A single straight chain: event, call api, kickoff pipeline, update DB, goal." height="160" src="../assets/images/12-factor-agents/agent-loop-dag.webp" width="1400"/>
+<figcaption><span class="figlabel">The materialised DAG</span>The same run flattened out afterwards. Whatever the loop did at run time, what it produced was an ordinary directed graph — which raises the question of what the loop bought you.
+  <span class="figsrc">From the <em>12-factor agents</em> repository by Dex Horthy / HumanLayer, licensed <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener" target="_blank">CC BY-SA 4.0</a>.</span></figcaption>
+</figure>
+<h4>The problem with this "loop until you solve it" pattern</h4>
+<p>The biggest problems with this pattern:</p>
+<ul>
+<li>Agents get lost when the context window gets too long - they spin out trying the same broken approach over and over again</li>
+<li>literally thats it, but that's enough to kneecap the approach</li>
+</ul>
+<p>Even if you haven't hand-rolled an agent, you've probably seen this long-context problem in working with agentic coding tools. They just get lost after a while and you need to start a new chat.</p>
+<p>I'll even perhaps posit something I've heard in passing quite a bit, and that YOU probably have developed your own intuition around:</p>
+<blockquote>
+<p><strong>Even as models support longer and longer context windows, you'll ALWAYS get better results with a small, focused prompt and context</strong></p>
+</blockquote>
+<p>Most builders I've talked to <strong>pushed the "tool calling loop" idea to the side</strong> when they realized that anything more than 10-20 turns becomes a big mess that the LLM can't recover from. Even if the agent gets it right 90% of the time, that's miles away from "good enough to put in customer hands". Can you imagine a web app that crashed on 10% of page loads?</p>
+<p><strong>Update 2025-06-09</strong> - I really like how <a href="https://x.com/swyx/status/1932125643384455237" rel="noopener" target="_blank">@swyx</a> put this:</p>
+<figure class="wide">
+<img alt="A screenshot of a post by swyx arguing that the top 1% of AI applications are built completely differently from the bottom 99%, that both are appropriate to their use case, and that the people guaranteed to fail are those who claim you can engineer around that fact and scale from small to very large on the same architecture." height="626" src="../assets/images/12-factor-agents/swyx-quote.webp" width="1186"/>
+<figcaption><span class="figlabel">On the top 1%</span>Added by Horthy in June 2025 as support for the guide's central claim: there is no single stack that carries you from demo to production.
+  <span class="figsrc">From the <em>12-factor agents</em> repository by Dex Horthy / HumanLayer, licensed <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener" target="_blank">CC BY-SA 4.0</a>.</span></figcaption>
+</figure>
+<h4>What actually works - micro agents</h4>
+<p>One thing that I <strong>have</strong> seen in the wild quite a bit is taking the agent pattern and sprinkling it into a broader more deterministic DAG. </p>
+<figure class="wide">
+<img alt="A mostly deterministic pipeline in which one boxed region contains a small agent loop, the rest being fixed steps." height="565" src="../assets/images/12-factor-agents/micro-agent-dag.webp" width="1400"/>
+<figcaption><span class="figlabel">Micro agents</span>What Horthy reports actually working in production: a small agent loop sitting inside a larger deterministic pipeline, rather than an agent that owns the whole workflow.
+  <span class="figsrc">From the <em>12-factor agents</em> repository by Dex Horthy / HumanLayer, licensed <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener" target="_blank">CC BY-SA 4.0</a>.</span></figcaption>
+</figure>
+<p>You might be asking - "why use agents at all in this case?" - we'll get into that shortly, but basically, having language models managing well-scoped sets of tasks makes it easy to incorporate live human feedback, translating it into workflow steps without spinning out into context error loops. (<a href="#factor-1">factor 1</a>, <a href="#factor-3">factor 3</a> <a href="#factor-7">factor 7</a>).</p>
+<blockquote>
+<p>having language models managing well-scoped sets of tasks makes it easy to incorporate live human feedback...without spinning out into context error loops</p>
+</blockquote>
+<h4>A real life micro agent</h4>
+<p>Here's an example of how deterministic code might run one micro agent responsible for handling the human-in-the-loop steps for deployment. </p>
+<figure class="wide">
+<img alt="A deployment pipeline: merge to main, deploy to staging, run end-to-end tests, then a boxed agent step handling production deployment with human approval, followed by production tests." height="645" src="../assets/images/12-factor-agents/deploybot-high-level.webp" width="1400"/>
+<figcaption><span class="figlabel">Deploybot</span>The micro-agent pattern applied to deployments. Everything except the human-in-the-loop step is deterministic code; the model's whole job is reading the human's plaintext feedback and proposing the next action.
+  <span class="figsrc">From the <em>12-factor agents</em> repository by Dex Horthy / HumanLayer, licensed <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener" target="_blank">CC BY-SA 4.0</a>.</span></figcaption>
+</figure>
+<ul>
+<li><strong>Human</strong> Merges PR to GitHub main branch</li>
+<li><strong>Deterministic Code</strong> Deploys to staging env</li>
+<li><strong>Deterministic Code</strong> Runs end-to-end (e2e) tests against staging</li>
+<li><strong>Deterministic Code</strong> Hands to agent for prod deployment, with initial context: "deploy SHA 4af9ec0 to production"</li>
+<li><strong>Agent</strong> calls <code>deploy_frontend_to_prod(4af9ec0)</code></li>
+<li><strong>Deterministic code</strong> requests human approval on this action</li>
+<li><strong>Human</strong> Rejects the action with feedback "can you deploy the backend first?"</li>
+<li><strong>Agent</strong> calls <code>deploy_backend_to_prod(4af9ec0)</code></li>
+<li><strong>Deterministic code</strong> requests human approval on this action</li>
+<li><strong>Human</strong> approves the action</li>
+<li><strong>Deterministic code</strong> executed the backend deployment</li>
+<li><strong>Agent</strong> calls <code>deploy_frontend_to_prod(4af9ec0)</code></li>
+<li><strong>Deterministic code</strong> requests human approval on this action</li>
+<li><strong>Human</strong> approves the action</li>
+<li><strong>Deterministic code</strong> executed the frontend deployment</li>
+<li><strong>Agent</strong> determines that the task was completed successfully, we're done!</li>
+<li><strong>Deterministic code</strong> run the end-to-end tests against production</li>
+<li><strong>Deterministic code</strong> task completed, OR pass to rollback agent to review failures and potentially roll back</li>
+</ul>
+<p>This example is based on a real life <a href="https://github.com/got-agents/agents/tree/main/deploybot-ts" rel="noopener" target="_blank">OSS agent we've shipped to manage our deployments at Humanlayer</a> - here is a real conversation I had with it last week:</p>
+<figure class="wide">
+<img alt="A screenshot of a Slack conversation in which a bot proposes a deployment, a human replies with corrections in plain English, and the bot revises its proposed action and asks again for approval." height="1425" src="../assets/images/12-factor-agents/deploybot-conversation.webp" width="1400"/>
+<figcaption><span class="figlabel">Deploybot in use</span>A real conversation with the deployment agent HumanLayer runs. Note how small the model's role is: it parses the correction and re-proposes, and the approval gate is code.
+  <span class="figsrc">From the <em>12-factor agents</em> repository by Dex Horthy / HumanLayer, licensed <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener" target="_blank">CC BY-SA 4.0</a>.</span></figcaption>
+</figure>
+<p>We haven't given this agent a huge pile of tools or tasks. The primary value in the LLM is parsing the human's plaintext feedback and proposing an updated course of action. We isolate tasks and contexts as much as possible to keep the LLM focused on a small, 5-10 step workflow.</p>
+<p>Here's another <a href="https://x.com/chainlit_io/status/1858613325921480922" rel="noopener" target="_blank">more classic support / chatbot demo</a>.</p>
+<h4>So what's an agent really?</h4>
+<ul>
+<li><strong>prompt</strong> - tell an LLM how to behave, and what "tools" it has available. The output of the prompt is a JSON object that describe the next step in the workflow (the "tool call" or "function call"). (<a href="#factor-2">factor 2</a>)</li>
+<li><strong>switch statement</strong> - based on the JSON that the LLM returns, decide what to do with it. (part of <a href="#factor-8">factor 8</a>)</li>
+<li><strong>accumulated context</strong> - store the list of steps that have happened and their results (<a href="#factor-3">factor 3</a>)</li>
+<li><strong>for loop</strong> - until the LLM emits some sort of "Terminal" tool call (or plaintext response), add the result of the switch statement to the context window and ask the LLM to choose the next step. (<a href="#factor-8">factor 8</a>)</li>
+</ul>
+<figure class="wide">
+<img alt="Four labelled blocks: prompt, switch statement, accumulated context, and a for loop, wired together into a cycle." height="744" src="../assets/images/12-factor-agents/four-components.webp" width="1400"/>
+<figcaption><span class="figlabel">What an agent is</span>The definition the guide argues for, and the one the twelve factors are written against: an agent is a prompt, a switch statement, an accumulating context window and a loop. Nothing else.
+  <span class="figsrc">From the <em>12-factor agents</em> repository by Dex Horthy / HumanLayer, licensed <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener" target="_blank">CC BY-SA 4.0</a>.</span></figcaption>
+</figure>
+<p>In the "deploybot" example, we gain a couple benefits from owning the control flow and context accumulation:</p>
+<ul>
+<li>In our <strong>switch statement</strong> and <strong>for loop</strong>, we can hijack control flow to pause for human input or to wait for completion of long-running tasks</li>
+<li>We can trivially serialize the <strong>context</strong> window for pause+resume</li>
+<li>In our <strong>prompt</strong>, we can optimize the heck out of how we pass instructions and "what happened so far" to the LLM</li>
+</ul>
+<p><a href="#the-problem">Part II</a> will <strong>formalize these patterns</strong> so they can be applied to add impressive AI features to any software project, without needing to go all in on conventional implementations/definitions of "AI agent".</p>
+<p><a href="#factor-1">Factor 1 - Natural Language to Tool Calls →</a></p>
+  </section>
+
+  <section id="factor-1">
+    <h2><span class="sec-num">01</span>Factor 1 — Natural Language to Tool Calls</h2>
+<p>One of the most common patterns in agent building is to convert natural language to structured tool calls. This is a powerful pattern that allows you to build agents that can reason about tasks and execute them.</p>
+<figure class="wide">
+<img alt="Four plain-English requests on the left — add a ticket, read this email thread and update the CRM, what's the status of my package, that's wrong, use the XYZ project — feeding a determine-next-step loop that fans out to read-data and write-data operations." height="788" src="../assets/images/12-factor-agents/factor-01-nl-to-tool-calls.webp" width="1400"/>
+<figcaption><span class="figlabel">Factor 1</span>Factor 1 in one picture: the model's job is turning a sentence into a structured call, and the calls divide into reads and writes. The annotation on the diagram is Horthy's own: <em>benefits: feels like magic</em>.
+  <span class="figsrc">From the <em>12-factor agents</em> repository by Dex Horthy / HumanLayer, licensed <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener" target="_blank">CC BY-SA 4.0</a>.</span></figcaption>
+</figure>
+<p>This pattern, when applied atomically, is the simple translation of a phrase like</p>
+<blockquote>
+<p>can you create a payment link for $750 to Terri for sponsoring the february AI tinkerers meetup? </p>
+</blockquote>
+<p>to a structured object that describes a Stripe API call like</p>
+<pre><code class="language-json">{
+  "function": {
+    "name": "create_payment_link",
+    "parameters": {
+      "amount": 750,
+      "customer": "cust_128934ddasf9",
+      "product": "prod_8675309",
+      "price": "prc_09874329fds",
+      "quantity": 1,
+      "memo": "Hey Jeff - see below for the payment link for the february ai tinkerers meetup"
+    }
+  }
+}
+</code></pre>
+<p><strong>Note</strong>: in reality the stripe API is a bit more complex, a <a href="https://github.com/dexhorthy/mailcrew" rel="noopener" target="_blank">real agent that does this</a> (<a href="https://www.youtube.com/watch?v=f_cKnoPC_Oo" rel="noopener" target="_blank">video</a>) would list customers, list products, list prices, etc to build this payload with the proper ids, or include those ids in the prompt/context window (we'll see below how those are kinda the same thing though!)</p>
+<p>From there, deterministic code can pick up the payload and do something with it. (More on this in <a href="#factor-3">factor 3</a>)</p>
+<pre><code class="language-python"># The LLM takes natural language and returns a structured object
+nextStep = await llm.determineNextStep(
+  """
+  create a payment link for $750 to Jeff 
+  for sponsoring the february AI tinkerers meetup
+  """
+  )
+
+# Handle the structured output based on its function
+if nextStep.function == 'create_payment_link':
+    stripe.paymentlinks.create(nextStep.parameters)
+    return  # or whatever you want, see below
+elif nextStep.function == 'something_else':
+    # ... more cases
+    pass
+else:  # the model didn't call a tool we know about
+    # do something else
+    pass
+</code></pre>
+<p><strong>NOTE</strong>: While a full agent would then receive the API call result and loop with it, eventually returning something like</p>
+<blockquote>
+<p>I've successfully created a payment link for $750 to Terri for sponsoring the february AI tinkerers meetup. Here's the link: https://buy.stripe.com/test_1234567890</p>
+</blockquote>
+<p><strong>Instead</strong>, We're actually going to skip that step here, and save it for another factor, which you may or may not want to also incorporate (up to you!)</p>
+  </section>
+
+  <section id="factor-2">
+    <h2><span class="sec-num">02</span>Factor 2 — Own Your Prompts</h2>
+<p>Don't outsource your prompt engineering to a framework. </p>
+<figure class="wide">
+<img alt="A side-by-side comparison. On the left, a short framework-style Agent and Task declaration with role, goal and personality fields, labelled black box. On the right, a full prompt written out as code in an editor, labelled full control." height="788" src="../assets/images/12-factor-agents/factor-02-own-your-prompts.webp" width="1400"/>
+<figcaption><span class="figlabel">Factor 2</span>The trade the factor asks you to make. The left is faster to write; the right is the only one you can actually tune, because you can see every token you are sending.
+  <span class="figsrc">From the <em>12-factor agents</em> repository by Dex Horthy / HumanLayer, licensed <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener" target="_blank">CC BY-SA 4.0</a>.</span></figcaption>
+</figure>
+<p>By the way, <a href="https://hamel.dev/blog/posts/prompt/" rel="noopener" target="_blank">this is far from novel advice:</a></p>
+<figure class="wide">
+<img alt="The Batman-slapping-Robin meme. Robin says a library gets the best output from your LLMs and to pip install it; Batman interrupts, shouting SHOW ME THE PROMPT." height="491" src="../assets/images/12-factor-agents/own-your-prompts-advice.webp" width="508"/>
+<figcaption><span class="figlabel">Not novel advice</span>Horthy's own illustration that owning your prompts is old advice rather than a new idea.
+  <span class="figsrc">From the <em>12-factor agents</em> repository by Dex Horthy / HumanLayer, licensed <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener" target="_blank">CC BY-SA 4.0</a>.</span></figcaption>
+</figure>
+<p>Some frameworks provide a "black box" approach like this:</p>
+<pre><code class="language-python">agent = Agent(
+  role="...",
+  goal="...",
+  personality="...",
+  tools=[tool1, tool2, tool3]
+)
+
+task = Task(
+  instructions="...",
+  expected_output=OutputModel
+)
+
+result = agent.run(task)
+</code></pre>
+<p>This is great for pulling in some TOP NOTCH prompt engineering to get you started, but it is often difficult to tune and/or reverse engineer to get exactly the right tokens into your model.</p>
+<p>Instead, own your prompts and treat them as first-class code:</p>
+<pre><code class="language-rust">function DetermineNextStep(thread: string) -&gt; DoneForNow | ListGitTags | DeployBackend | DeployFrontend | RequestMoreInformation {
+  prompt #"
+    {{ _.role("system") }}
+
+    You are a helpful assistant that manages deployments for frontend and backend systems.
+    You work diligently to ensure safe and successful deployments by following best practices
+    and proper deployment procedures.
+
+    Before deploying any system, you should check:
+    - The deployment environment (staging vs production)
+    - The correct tag/version to deploy
+    - The current system status
+
+    You can use tools like deploy_backend, deploy_frontend, and check_deployment_status
+    to manage deployments. For sensitive deployments, use request_approval to get
+    human verification.
+
+    Always think about what to do first, like:
+    - Check current deployment status
+    - Verify the deployment tag exists
+    - Request approval if needed
+    - Deploy to staging before production
+    - Monitor deployment progress
+
+    {{ _.role("user") }}
+
+    {{ thread }}
+
+    What should the next step be?
+  "#
+}
+</code></pre>
+<p>(the above example uses <a href="https://github.com/boundaryml/baml" rel="noopener" target="_blank">BAML</a> to generate the prompt, but you can do this with any prompt engineering tool you want, or even just template it manually)</p>
+<p>If the signature looks a little funny, we'll get to that in <a href="#factor-4">factor 4 - tools are just structured outputs</a></p>
+<pre><code class="language-typescript">function DetermineNextStep(thread: string) -&gt; DoneForNow | ListGitTags | DeployBackend | DeployFrontend | RequestMoreInformation {
+</code></pre>
+<p>Key benefits of owning your prompts:</p>
+<ol>
+<li><strong>Full Control</strong>: Write exactly the instructions your agent needs, no black box abstractions</li>
+<li><strong>Testing and Evals</strong>: Build tests and evals for your prompts just like you would for any other code</li>
+<li><strong>Iteration</strong>: Quickly modify prompts based on real-world performance</li>
+<li><strong>Transparency</strong>: Know exactly what instructions your agent is working with</li>
+<li><strong>Role Hacking</strong>: take advantage of APIs that support nonstandard usage of user/assistant roles - for example, the now-deprecated non-chat flavor of OpenAI "completions" API. This includes some so-called "model gaslighting" techniques</li>
+</ol>
+<p>Remember: Your prompts are the primary interface between your application logic and the LLM.</p>
+<p>Having full control over your prompts gives you the flexibility and prompt control you need for production-grade agents.</p>
+<p>I don't know what's the best prompt, but I know you want the flexibility to be able to try EVERYTHING.</p>
+  </section>
+
+  <section id="factor-3">
+    <h2><span class="sec-num">03</span>Factor 3 — Own Your Context Window</h2>
+<p>You don't necessarily need to use standard message-based formats for conveying context to an LLM.</p>
+<blockquote>
+<p>At any given point, your input to an LLM in an agent is "here's what's happened so far, what's the next step"</p>
+</blockquote>
+<p>Everything is context engineering. <a href="https://thedataexchange.media/baml-revolution-in-ai-engineering/" rel="noopener" target="_blank">LLMs are stateless functions</a> that turn inputs into outputs. To get the best outputs, you need to give them the best inputs.</p>
+<p>Creating great context means:</p>
+<ul>
+<li>The prompt and instructions you give to the model</li>
+<li>Any documents or external data you retrieve (e.g. RAG)</li>
+<li>Any past state, tool calls, results, or other history </li>
+<li>Any past messages or events from related but separate histories/conversations (Memory)</li>
+<li>Instructions about what sorts of structured data to output</li>
+</ul>
+<figure class="wide">
+<img alt="A large circle labelled Context Engineering containing overlapping circles for RAG, prompt engineering, state and history, memory, and structured outputs." height="788" src="../assets/images/12-factor-agents/context-includes.webp" width="1400"/>
+<figcaption><span class="figlabel">Everything is context</span>What the factor means by owning the context window: prompt engineering, retrieval, memory and output schemas are all the same job, which is deciding what text reaches the model.
+  <span class="figsrc">From the <em>12-factor agents</em> repository by Dex Horthy / HumanLayer, licensed <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener" target="_blank">CC BY-SA 4.0</a>.</span></figcaption>
+</figure>
+<h3>on context engineering</h3>
+<p>This guide is all about getting as much as possible out of today's models. Notably not mentioned are:</p>
+<ul>
+<li>Changes to models parameters like temperature, top_p, frequency_penalty, presence_penalty, etc.</li>
+<li>Training your own completion or embedding models</li>
+<li>Fine-tuning existing models</li>
+</ul>
+<p>Again, I don't know what's the best way to hand context to an LLM, but I know you want the flexibility to be able to try EVERYTHING.</p>
+<h4>Standard vs Custom Context Formats</h4>
+<p>Most LLM clients use a standard message-based format like this:</p>
+<pre><code class="language-yaml">[
+  {
+    "role": "system",
+    "content": "You are a helpful assistant..."
+  },
+  {
+    "role": "user",
+    "content": "Can you deploy the backend?"
+  },
+  {
+    "role": "assistant",
+    "content": null,
+    "tool_calls": [
+      {
+        "id": "1",
+        "name": "list_git_tags",
+        "arguments": "{}"
+      }
+    ]
+  },
+  {
+    "role": "tool",
+    "name": "list_git_tags",
+    "content": "{\"tags\": [{\"name\": \"v1.2.3\", \"commit\": \"abc123\", \"date\": \"2024-03-15T10:00:00Z\"}, {\"name\": \"v1.2.2\", \"commit\": \"def456\", \"date\": \"2024-03-14T15:30:00Z\"}, {\"name\": \"v1.2.1\", \"commit\": \"abe033d\", \"date\": \"2024-03-13T09:15:00Z\"}]}",
+    "tool_call_id": "1"
+  }
+]
+</code></pre>
+<p>While this works great for most use cases, if you want to really get THE MOST out of today's LLMs, you need to get your context into the LLM in the most token- and attention-efficient way you can.</p>
+<p>As an alternative to the standard message-based format, you can build your own context format that's optimized for your use case. For example, you can use custom objects and pack/spread them into one or more user, system, assistant, or tool messages as makes sense.</p>
+<p>Here's an example of putting the whole context window into a single user message:</p>
+<pre><code class="language-yaml">
+[
+  {
+    "role": "system",
+    "content": "You are a helpful assistant..."
+  },
+  {
+    "role": "user",
+    "content": |
+            Here's everything that happened so far:
+
+        &lt;slack_message&gt;
+            From: @alex
+            Channel: #deployments
+            Text: Can you deploy the backend?
+        &lt;/slack_message&gt;
+
+        &lt;list_git_tags&gt;
+            intent: "list_git_tags"
+        &lt;/list_git_tags&gt;
+
+        &lt;list_git_tags_result&gt;
+            tags:
+              - name: "v1.2.3"
+                commit: "abc123"
+                date: "2024-03-15T10:00:00Z"
+              - name: "v1.2.2"
+                commit: "def456"
+                date: "2024-03-14T15:30:00Z"
+              - name: "v1.2.1"
+                commit: "ghi789"
+                date: "2024-03-13T09:15:00Z"
+        &lt;/list_git_tags_result&gt;
+
+        what's the next step?
+    }
+]
+</code></pre>
+<p>The model may infer that you're asking it <code>what's the next step</code> by the tool schemas you supply, but it never hurts to roll it into your prompt template.</p>
+<h3>code example</h3>
+<p>We can build this with something like: </p>
+<pre><code class="language-python">
+class Thread:
+  events: List[Event]
+
+class Event:
+  # could just use string, or could be explicit - up to you
+  type: Literal["list_git_tags", "deploy_backend", "deploy_frontend", "request_more_information", "done_for_now", "list_git_tags_result", "deploy_backend_result", "deploy_frontend_result", "request_more_information_result", "done_for_now_result", "error"]
+  data: ListGitTags | DeployBackend | DeployFrontend | RequestMoreInformation |  
+        ListGitTagsResult | DeployBackendResult | DeployFrontendResult | RequestMoreInformationResult | string
+
+def event_to_prompt(event: Event) -&gt; str:
+    data = event.data if isinstance(event.data, str) \
+           else stringifyToYaml(event.data)
+
+    return f"&lt;{event.type}&gt;\n{data}\n&lt;/{event.type}&gt;"
+
+
+def thread_to_prompt(thread: Thread) -&gt; str:
+  return '\n\n'.join(event_to_prompt(event) for event in thread.events)
+</code></pre>
+<h4>Example Context Windows</h4>
+<p>Here's how context windows might look with this approach:</p>
+<p><strong>Initial Slack Request:</strong></p>
+<pre><code class="language-xml">&lt;slack_message&gt;
+    From: @alex
+    Channel: #deployments
+    Text: Can you deploy the latest backend to production?
+&lt;/slack_message&gt;
+</code></pre>
+<p><strong>After Listing Git Tags:</strong></p>
+<pre><code class="language-xml">&lt;slack_message&gt;
+    From: @alex
+    Channel: #deployments
+    Text: Can you deploy the latest backend to production?
+    Thread: []
+&lt;/slack_message&gt;
+
+&lt;list_git_tags&gt;
+    intent: "list_git_tags"
+&lt;/list_git_tags&gt;
+
+&lt;list_git_tags_result&gt;
+    tags:
+      - name: "v1.2.3"
+        commit: "abc123"
+        date: "2024-03-15T10:00:00Z"
+      - name: "v1.2.2"
+        commit: "def456"
+        date: "2024-03-14T15:30:00Z"
+      - name: "v1.2.1"
+        commit: "ghi789"
+        date: "2024-03-13T09:15:00Z"
+&lt;/list_git_tags_result&gt;
+</code></pre>
+<p><strong>After Error and Recovery:</strong></p>
+<pre><code class="language-xml">&lt;slack_message&gt;
+    From: @alex
+    Channel: #deployments
+    Text: Can you deploy the latest backend to production?
+    Thread: []
+&lt;/slack_message&gt;
+
+&lt;deploy_backend&gt;
+    intent: "deploy_backend"
+    tag: "v1.2.3"
+    environment: "production"
+&lt;/deploy_backend&gt;
+
+&lt;error&gt;
+    error running deploy_backend: Failed to connect to deployment service
+&lt;/error&gt;
+
+&lt;request_more_information&gt;
+    intent: "request_more_information_from_human"
+    question: "I had trouble connecting to the deployment service, can you provide more details and/or check on the status of the service?"
+&lt;/request_more_information&gt;
+
+&lt;human_response&gt;
+    data:
+      response: "I'm not sure what's going on, can you check on the status of the latest workflow?"
+&lt;/human_response&gt;
+</code></pre>
+<p>From here your next step might be: </p>
+<pre><code class="language-python">nextStep = await determine_next_step(thread_to_prompt(thread))
+</code></pre>
+<pre><code class="language-python">{
+  "intent": "get_workflow_status",
+  "workflow_name": "tag_push_prod.yaml",
+}
+</code></pre>
+<p>The XML-style format is just one example - the point is you can build your own format that makes sense for your application. You'll get better quality if you have the flexibility to experiment with different context structures and what you store vs. what you pass to the LLM. </p>
+<p>Key benefits of owning your context window:</p>
+<ol>
+<li><strong>Information Density</strong>: Structure information in ways that maximize the LLM's understanding</li>
+<li><strong>Error Handling</strong>: Include error information in a format that helps the LLM recover. Consider hiding errors and failed calls from context window once they are resolved.</li>
+<li><strong>Safety</strong>: Control what information gets passed to the LLM, filtering out sensitive data</li>
+<li><strong>Flexibility</strong>: Adapt the format as you learn what works best for your use case</li>
+<li><strong>Token Efficiency</strong>: Optimize context format for token efficiency and LLM understanding</li>
+</ol>
+<p>Context includes: prompts, instructions, RAG documents, history, tool calls, memory</p>
+<p>Remember: The context window is your primary interface with the LLM. Taking control of how you structure and present information can dramatically improve your agent's performance.</p>
+<p>Example - information density - same message, fewer tokens:</p>
+<figure class="wide">
+<img alt="Two token-highlighted panels of the same request. The left, in JSON message format, reads 87 tokens and 336 characters. The right, in XML-style tags, reads 57 tokens and 182 characters." height="660" src="../assets/images/12-factor-agents/information-density.webp" width="1400"/>
+<figcaption><span class="figlabel">Information density</span>The concrete payoff the factor claims: the same message, 87 tokens in the standard format against 57 in a custom one. This is the one measured number in the whole guide.
+  <span class="figsrc">From the <em>12-factor agents</em> repository by Dex Horthy / HumanLayer, licensed <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener" target="_blank">CC BY-SA 4.0</a>.</span></figcaption>
+</figure>
+<h3>Don't take it from me</h3>
+<p>About 2 months after 12-factor agents was published, context engineering started to become a pretty popular term.</p>
+<figure class="wide">
+<img alt="A screenshot of a post discussing context engineering as the more accurate name for the discipline people had been calling prompt engineering." height="854" src="../assets/images/12-factor-agents/context-engineering-1.webp" width="1166"/>
+<figcaption><span class="figlabel">Don't take it from me</span>One of two posts Horthy cites to show the term caught on independently about two months after the guide was published.
+  <span class="figsrc">From the <em>12-factor agents</em> repository by Dex Horthy / HumanLayer, licensed <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener" target="_blank">CC BY-SA 4.0</a>.</span></figcaption>
+</figure>
+<figure class="wide">
+<img alt="A second screenshot of a post making the same argument, that the craft of filling the context window is the substance of the work." height="564" src="../assets/images/12-factor-agents/context-engineering-2.webp" width="1184"/>
+<figcaption><span class="figlabel">Don't take it from me</span>The second of the two.
+  <span class="figsrc">From the <em>12-factor agents</em> repository by Dex Horthy / HumanLayer, licensed <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener" target="_blank">CC BY-SA 4.0</a>.</span></figcaption>
+</figure>
+<p>There's also a quite good <a href="https://x.com/lenadroid/status/1943685060785524824" rel="noopener" target="_blank">Context Engineering Cheat Sheet</a> from <a href="https://x.com/lenadroid" rel="noopener" target="_blank">@lenadroid</a> from July 2025.</p>
+<figure class="wide">
+<img alt="A dense dark-background infographic covering context engineering: writing, selecting and compressing context; context isolation, poisoning, distraction and confusion; and a set of core pillars for writing, selecting, compressing and isolating information." height="1272" src="../assets/images/12-factor-agents/context-cheat-sheet.webp" width="1400"/>
+<figcaption><span class="figlabel">Context engineering cheat sheet</span>The cheat sheet by @lenadroid that Horthy recommends from July 2025. It is reproduced here at the source's own resolution; open the original for a legible copy.
+  <span class="figsrc">From the <em>12-factor agents</em> repository by Dex Horthy / HumanLayer, licensed <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener" target="_blank">CC BY-SA 4.0</a>.</span></figcaption>
+</figure>
+<p>Recurring theme here: I don't know what's the best approach, but I know you want the flexibility to be able to try EVERYTHING.</p>
+  </section>
+
+  <section id="factor-4">
+    <h2><span class="sec-num">04</span>Factor 4 — Tools Are Just Structured Outputs</h2>
+<p>Tools don't need to be complex. At their core, they're just structured output from your LLM that triggers deterministic code.</p>
+<figure class="wide">
+<img alt="Two dark code panels. On the left, an OpenAI tools array declaring multiply and add functions as JSON schema. On the right, a plain prompt asking for the next step and listing the same options as JSON shapes to answer in." height="788" src="../assets/images/12-factor-agents/factor-04-structured-outputs.webp" width="1400"/>
+<figcaption><span class="figlabel">Factor 4</span>Both panels ask the model for the same thing. The factor's point is that the schema machinery on the left is one way to get structured JSON, not the definition of a tool.
+  <span class="figsrc">From the <em>12-factor agents</em> repository by Dex Horthy / HumanLayer, licensed <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener" target="_blank">CC BY-SA 4.0</a>.</span></figcaption>
+</figure>
+<p>For example, lets say you have two tools <code>CreateIssue</code> and <code>SearchIssues</code>. To ask an LLM to "use one of several tools" is just to ask it to output JSON we can parse into an object representing those tools.</p>
+<pre><code class="language-python">
+class Issue:
+  title: str
+  description: str
+  team_id: str
+  assignee_id: str
+
+class CreateIssue:
+  intent: "create_issue"
+  issue: Issue
+
+class SearchIssues:
+  intent: "search_issues"
+  query: str
+  what_youre_looking_for: str
+</code></pre>
+<p>The pattern is simple:
+1. LLM outputs structured JSON
+3. Deterministic code executes the appropriate action (like calling an external API)
+4. Results are captured and fed back into the context</p>
+<p>This creates a clean separation between the LLM's decision-making and your application's actions. The LLM decides what to do, but your code controls how it's done. Just because an LLM "called a tool" doesn't mean you have to go execute a specific corresponding function in the same way every time.</p>
+<p>If you recall our switch statement from above</p>
+<pre><code class="language-python">if nextStep.intent == 'create_payment_link':
+    stripe.paymentlinks.create(nextStep.parameters)
+    return # or whatever you want, see below
+elif nextStep.intent == 'wait_for_a_while': 
+    # do something monadic idk
+else: #... the model didn't call a tool we know about
+    # do something else
+</code></pre>
+<p><strong>Note</strong>: there has been a lot said about the benefits of "plain prompting" vs. "tool calling" vs. "JSON mode" and the performance tradeoffs of each. We'll link some resources to that stuff soon, but not gonna get into it here. See <a href="https://www.boundaryml.com/blog/schema-aligned-parsing" rel="noopener" target="_blank">Prompting vs JSON Mode vs Function Calling vs Constrained Generation vs SAP</a>, <a href="https://www.vellum.ai/blog/when-should-i-use-function-calling-structured-outputs-or-json-mode#:~:text=We%20don%27t%20recommend%20using%20JSON,always%20use%20Structured%20Outputs%20instead" rel="noopener" target="_blank">When should I use function calling, structured outputs, or JSON mode?</a> and <a href="https://docs.llamaindex.ai/en/stable/examples/llm/openai_json_vs_function_calling/" rel="noopener" target="_blank">OpenAI JSON vs Function Calling</a>.</p>
+<p>The "next step" might not be as atomic as just "run a pure function and return the result". You unlock a lot of flexibility when you think of "tool calls" as just a model outputting JSON describing what deterministic code should do. Put this together with <a href="#factor-8">factor 8 own your control flow</a>.</p>
+  </section>
+
+  <section id="factor-5">
+    <h2><span class="sec-num">05</span>Factor 5 — Unify Execution State and Business State</h2>
+<p>Even outside the AI world, many infrastructure systems try to separate "execution state" from "business state". For AI apps, this might involve complex abstractions to track things like current step, next step, waiting status, retry counts, etc. This separation creates complexity that may be worthwhile, but may be overkill for your use case. </p>
+<p>As always, it's up to you to decide what's right for your application. But don't think you <em>have</em> to manage them separately.</p>
+<p>More clearly:</p>
+<ul>
+<li><strong>Execution state</strong>: current step, next step, waiting status, retry counts, etc. </li>
+<li><strong>Business state</strong>: What's happened in the agent workflow so far (e.g. list of OpenAI messages, list of tool calls and results, etc.)</li>
+</ul>
+<p>If possible, SIMPLIFY - unify these as much as possible. </p>
+<figure class="wide">
+<img alt="The same unify-state diagram with the loop-or-pause path and the resume arrow drawn in, showing a run being serialised to a database and picked up again from an intermediate state." height="322" src="../assets/images/12-factor-agents/unify-state-flow.webp" width="800"/>
+<figcaption><span class="figlabel">Factor 5, in motion</span>The same idea traced through a run: pause, serialise, resume from any point, fork from any earlier context.
+  <span class="figsrc">From the <em>12-factor agents</em> repository by Dex Horthy / HumanLayer, licensed <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener" target="_blank">CC BY-SA 4.0</a>. Final frame of the source animation.</span></figcaption>
+</figure>
+<p>In reality, you can engineer your application so that you can infer all execution state from the context window. In many cases, execution state (current step, waiting status, etc.) is just metadata about what has happened so far.</p>
+<p>You may have things that can't go in the context window, like session ids, password contexts, etc, but your goal should be to minimize those things. By embracing <a href="#factor-3">factor 3</a> you can control what actually goes into the LLM </p>
+<p>This approach has several benefits:</p>
+<ol>
+<li><strong>Simplicity</strong>: One source of truth for all state</li>
+<li><strong>Serialization</strong>: The thread is trivially serializable/deserializable</li>
+<li><strong>Debugging</strong>: The entire history is visible in one place</li>
+<li><strong>Flexibility</strong>: Easy to add new state by just adding new event types</li>
+<li><strong>Recovery</strong>: Can resume from any point by just loading the thread</li>
+<li><strong>Forking</strong>: Can fork the thread at any point by copying some subset of the thread into a new context / state ID</li>
+<li><strong>Human Interfaces and Observability</strong>: Trivial to convert a thread into a human-readable markdown or a rich Web app UI</li>
+</ol>
+  </section>
+
+  <section id="factor-6">
+    <h2><span class="sec-num">06</span>Factor 6 — Launch/Pause/Resume with Simple APIs</h2>
+<p>Agents are just programs, and we have things we expect from how to launch, query, resume, and stop them.</p>
+<figure class="wide">
+<img alt="The same launch, pause and resume diagram with the full cycle drawn: context loaded, a long-running tool launched, the run serialised with a state ID, and a webhook delivering the result back into a resumed run." height="865" src="../assets/images/12-factor-agents/pause-resume-flow.webp" width="1400"/>
+<figcaption><span class="figlabel">Factor 6, in motion</span>The round trip in full, ending where it began. Resuming needs nothing but the state ID.
+  <span class="figsrc">From the <em>12-factor agents</em> repository by Dex Horthy / HumanLayer, licensed <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener" target="_blank">CC BY-SA 4.0</a>. Final frame of the source animation.</span></figcaption>
+</figure>
+<p>It should be easy for users, apps, pipelines, and other agents to launch an agent with a simple API.</p>
+<p>Agents and their orchestrating deterministic code should be able to pause an agent when a long-running operation is needed.</p>
+<p>External triggers like webhooks should enable agents to resume from where they left off without deep integration with the agent orchestrator.</p>
+<p>Closely related to <a href="#factor-5">factor 5 - unify execution state and business state</a> and <a href="#factor-8">factor 8 - own your control flow</a>, but can be implemented independently.</p>
+<p><strong>Note</strong> - often AI orchestrators will allow for pause and resume, but not between the moment of tool selection and tool execution. See also <a href="#factor-7">factor 7 - contact humans with tool calls</a> and <a href="#factor-11">factor 11 - trigger from anywhere, meet users where they are</a>.</p>
+  </section>
+
+  <section id="factor-7">
+    <h2><span class="sec-num">07</span>Factor 7 — Contact Humans with Tool Calls</h2>
+<p>By default, LLM APIs rely on a fundamental HIGH-STAKES token choice: Are we returning plaintext content, or are we returning structured data?</p>
+<figure class="wide">
+<img alt="A comparison. On the left, a model output that is either plaintext content or a tool call, labelled: model switches between tools and plaintext. On the right, three variants all expressed as tool calls — final answer, request clarification, and check weather — labelled: everything is tools." height="788" src="../assets/images/12-factor-agents/factor-07-contact-humans.webp" width="1400"/>
+<figcaption><span class="figlabel">Factor 7</span>The high-stakes first-token choice the factor is about. Making every response a tool call, including asking a human a question, removes that choice from the model.
+  <span class="figsrc">From the <em>12-factor agents</em> repository by Dex Horthy / HumanLayer, licensed <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener" target="_blank">CC BY-SA 4.0</a>.</span></figcaption>
+</figure>
+<p>You're putting a lot of weight on that choice of first token, which, in the <code>the weather in tokyo</code> case, is</p>
+<blockquote>
+<p>"the"</p>
+</blockquote>
+<p>but in the <code>fetch_weather</code> case, it's some special token to denote the start of a JSON object.</p>
+<blockquote>
+<p>|JSON&gt;</p>
+</blockquote>
+<p>You might get better results by having the LLM <em>always</em> output json, and then declare it's intent with some natural language tokens like <code>request_human_input</code> or <code>done_for_now</code> (as opposed to a "proper" tool like <code>check_weather_in_city</code>). </p>
+<p>Again, you might not get any performance boost from this, but you should experiment, and ensure you're free to try weird stuff to get the best results.</p>
+<pre><code class="language-python">
+class Options:
+  urgency: Literal["low", "medium", "high"]
+  format: Literal["free_text", "yes_no", "multiple_choice"]
+  choices: List[str]
+
+# Tool definition for human interaction
+class RequestHumanInput:
+  intent: "request_human_input"
+  question: str
+  context: str
+  options: Options
+
+# Example usage in the agent loop
+if nextStep.intent == 'request_human_input':
+  thread.events.append({
+    type: 'human_input_requested',
+    data: nextStep
+  })
+  thread_id = await save_state(thread)
+  await notify_human(nextStep, thread_id)
+  return # Break loop and wait for response to come back with thread ID
+else:
+  # ... other cases
+</code></pre>
+<p>Later, you might receive a webhook from a system that handles slack, email, sms, or other events.</p>
+<pre><code class="language-python">
+@app.post('/webhook')
+def webhook(req: Request):
+  thread_id = req.body.threadId
+  thread = await load_state(thread_id)
+  thread.events.push({
+    type: 'response_from_human',
+    data: req.body
+  })
+  # ... simplified for brevity, you likely don't want to block the web worker here
+  next_step = await determine_next_step(thread_to_prompt(thread))
+  thread.events.append(next_step)
+  result = await handle_next_step(thread, next_step)
+  # todo - loop or break or whatever you want
+
+  return {"status": "ok"}
+</code></pre>
+<p>The above includes patterns from <a href="#factor-5">factor 5 - unify execution state and business state</a>, <a href="#factor-8">factor 8 - own your control flow</a>, <a href="#factor-3">factor 3 - own your context window</a>, and <a href="#factor-4">factor 4 - tools are just structured outputs</a>, and several others.</p>
+<p>If we were using the XML-y formatted from <a href="#factor-3">factor 3 - own your context window</a>, our context window after a few turns might look like this:</p>
+<pre><code class="language-xml">
+(snipped for brevity)
+
+&lt;slack_message&gt;
+    From: @alex
+    Channel: #deployments
+    Text: Can you deploy backend v1.2.3 to production?
+    Thread: []
+&lt;/slack_message&gt;
+
+&lt;request_human_input&gt;
+    intent: "request_human_input"
+    question: "Would you like to proceed with deploying v1.2.3 to production?"
+    context: "This is a production deployment that will affect live users."
+    options: {
+        urgency: "high"
+        format: "yes_no"
+    }
+&lt;/request_human_input&gt;
+
+&lt;human_response&gt;
+    response: "yes please proceed"
+    approved: true
+    timestamp: "2024-03-15T10:30:00Z"
+    user: "alex@company.com"
+&lt;/human_response&gt;
+
+&lt;deploy_backend&gt;
+    intent: "deploy_backend"
+    tag: "v1.2.3"
+    environment: "production"
+&lt;/deploy_backend&gt;
+
+&lt;deploy_backend_result&gt;
+    status: "success"
+    message: "Deployment v1.2.3 to production completed successfully."
+    timestamp: "2024-03-15T10:30:00Z"
+&lt;/deploy_backend_result&gt;
+</code></pre>
+<p>Benefits:</p>
+<ol>
+<li><strong>Clear Instructions</strong>: Tools for different types of human contact allow for more specificity from the LLM</li>
+<li><strong>Inner vs Outer Loop</strong>: Enables agents workflows <strong>outside</strong> of the traditional chatGPT-style interface, where the control flow and context initialization may be <code>Agent-&gt;Human</code> rather than <code>Human-&gt;Agent</code> (think, agents kicked off by a cron or an event)</li>
+<li><strong>Multiple Human Access</strong>: Can easily track and coordinate input from different humans through structured events</li>
+<li><strong>Multi-Agent</strong>: Simple abstraction can be easily extended to support <code>Agent-&gt;Agent</code> requests and responses</li>
+<li><strong>Durable</strong>: Combined with <a href="#factor-6">factor 6 - launch/pause/resume with simple APIs</a>, this makes for durable, reliable, and introspectable multiplayer workflows</li>
+</ol>
+<p><a href="https://theouterloop.substack.com/p/openais-realtime-api-is-a-step-towards" rel="noopener" target="_blank">More on Outer Loop Agents over here</a></p>
+<figure class="wide">
+<img alt="A diagram contrasting a human-initiated agent conversation with an agent started by a cron job or event that later contacts a human for approval." height="601" src="../assets/images/12-factor-agents/outer-loop-agents.webp" width="1400"/>
+<figcaption><span class="figlabel">Outer loop agents</span>What contacting humans with tool calls makes possible: runs that begin without a human present and reach for one only when they need to.
+  <span class="figsrc">From the <em>12-factor agents</em> repository by Dex Horthy / HumanLayer, licensed <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener" target="_blank">CC BY-SA 4.0</a>.</span></figcaption>
+</figure>
+<p>Works great with <a href="#factor-11">factor 11 - trigger from anywhere, meet users where they are</a></p>
+  </section>
+
+  <section id="factor-8">
+    <h2><span class="sec-num">08</span>Factor 8 — Own Your Control Flow</h2>
+<p>If you own your control flow, you can do lots of fun things.</p>
+<figure class="wide">
+<img alt="A control-flow diagram with a determine-next-step node fanning out to structured outputs, passing through a switch statement, with branches for summarize, judge, break or pause for input, and a combine step feeding a new context window." height="788" src="../assets/images/12-factor-agents/factor-08-control-flow.webp" width="1400"/>
+<figcaption><span class="figlabel">Factor 8</span>Owning the switch statement is what lets you insert summarisation, an LLM-as-judge check, or a pause for human input at exactly the point you choose. The annotation reads: <em>benefits: interrupts, process control</em>.
+  <span class="figsrc">From the <em>12-factor agents</em> repository by Dex Horthy / HumanLayer, licensed <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener" target="_blank">CC BY-SA 4.0</a>.</span></figcaption>
+</figure>
+<p>Build your own control structures that make sense for your specific use case. Specifically, certain types of tool calls may be reason to break out of the loop and wait for a response from a human or another long-running task like a training pipeline. You may also want to incorporate custom implementation of:</p>
+<ul>
+<li>summarization or caching of tool call results</li>
+<li>LLM-as-judge on structured output</li>
+<li>context window compaction or other <a href="#factor-3">memory management</a></li>
+<li>logging, tracing, and metrics</li>
+<li>client-side rate limiting</li>
+<li>durable sleep / pause / "wait for event"</li>
+</ul>
+<p>The below example shows three possible control flow patterns:</p>
+<ul>
+<li>request_clarification: model asked for more info, break the loop and wait for a response from a human</li>
+<li>fetch_git_tags: model asked for a list of git tags, fetch the tags, append to context window, and pass straight back to the model</li>
+<li>deploy_backend: model asked to deploy a backend, this is a high-stakes thing, so break the loop and wait for human approval</li>
+</ul>
+<pre><code class="language-python">def handle_next_step(thread: Thread):
+
+  while True:
+    next_step = await determine_next_step(thread_to_prompt(thread))
+
+    # inlined for clarity - in reality you could put 
+    # this in a method, use exceptions for control flow, or whatever you want
+    if next_step.intent == 'request_clarification':
+      thread.events.append({
+        type: 'request_clarification',
+          data: nextStep,
+        })
+
+      await send_message_to_human(next_step)
+      await db.save_thread(thread)
+      # async step - break the loop, we'll get a webhook later
+      break
+    elif next_step.intent == 'fetch_open_issues':
+      thread.events.append({
+        type: 'fetch_open_issues',
+        data: next_step,
+      })
+
+      issues = await linear_client.issues()
+
+      thread.events.append({
+        type: 'fetch_open_issues_result',
+        data: issues,
+      })
+      # sync step - pass the new context to the LLM to determine the NEXT next step
+      continue
+    elif next_step.intent == 'create_issue':
+      thread.events.append({
+        type: 'create_issue',
+        data: next_step,
+      })
+
+      await request_human_approval(next_step)
+      await db.save_thread(thread)
+      # async step - break the loop, we'll get a webhook later
+      break
+</code></pre>
+<p>This pattern allows you to interrupt and resume your agent's flow as needed, creating more natural conversations and workflows.</p>
+<p><strong>Example</strong> - the number one feature request I have for every AI framework out there is we need to be able to interrupt 
+a working agent and resume later, ESPECIALLY between the moment of tool <strong>selection</strong> and the moment of tool <strong>invocation</strong>.</p>
+<p>Without this level of resumability/granularity, there's no way to review/approve the tool call before it runs, which means
+you're forced to either:</p>
+<ol>
+<li>Pause the task in memory while waiting for the long-running thing to complete (think <code>while...sleep</code>) and restart it from the beginning if the process is interrupted</li>
+<li>Restrict the agent to only low-stakes, low-risk calls like research and summarization</li>
+<li>Give the agent access to do bigger, more useful things, and just yolo hope it doesn't screw up</li>
+</ol>
+<p>You may notice this is closely related to <a href="#factor-5">factor 5 - unify execution state and business state</a> and <a href="#factor-6">factor 6 - launch/pause/resume with simple APIs</a>, but can be implemented independently.</p>
+  </section>
+
+  <section id="factor-9">
+    <h2><span class="sec-num">09</span>Factor 9 — Compact Errors into Context Window</h2>
+<p>This one is a little short but is worth mentioning. One of these benefits of agents is "self-healing" - for short tasks, an LLM might call a tool that fails. Good LLMs have a fairly good chance of reading an error message or stack trace and figuring out what to change in a subsequent tool call.</p>
+<p>Most frameworks implement this, but you can do JUST THIS without doing any of the other 11 factors. Here's an example: </p>
+<pre><code class="language-python">thread = {"events": [initial_message]}
+
+while True:
+  next_step = await determine_next_step(thread_to_prompt(thread))
+  thread["events"].append({
+    "type": next_step.intent,
+    "data": next_step,
+  })
+  try:
+    result = await handle_next_step(thread, next_step) # our switch statement
+  except Exception as e:
+    # if we get an error, we can add it to the context window and try again
+    thread["events"].append({
+      "type": 'error',
+      "data": format_error(e),
+    })
+    # loop, or do whatever else here to try to recover
+</code></pre>
+<p>You may want to implement an errorCounter for a specific tool call, to limit to ~3 attempts of a single tool, or whatever other logic makes sense for your use case. </p>
+<pre><code class="language-python">consecutive_errors = 0
+
+while True:
+
+  # ... existing code ...
+
+  try:
+    result = await handle_next_step(thread, next_step)
+    thread["events"].append({
+      "type": next_step.intent + '_result',
+      data: result,
+    })
+    # success! reset the error counter
+    consecutive_errors = 0
+  except Exception as e:
+    consecutive_errors += 1
+    if consecutive_errors &lt; 3:
+      # do the loop and try again
+      thread["events"].append({
+        "type": 'error',
+        "data": format_error(e),
+      })
+    else:
+      # break the loop, reset parts of the context window, escalate to a human, or whatever else you want to do
+      break
+  }
+}
+</code></pre>
+<p>Hitting some consecutive-error-threshold might be a great place to <a href="#factor-7">escalate to a human</a>, whether by model decision or via deterministic takeover of the control flow.</p>
+<figure class="wide">
+<img alt="A loop diagram in which one branch returns a failure marked in red. The failure is folded into the new context window alongside the successful steps, and a retry is attempted, annotated: benefits, self-healing agents." height="788" src="../assets/images/12-factor-agents/factor-09-compact-errors.webp" width="1400"/>
+<figcaption><span class="figlabel">Factor 9</span>The self-healing loop. The error goes back into the context as another event, and the model gets a chance to read it and choose differently.
+  <span class="figsrc">From the <em>12-factor agents</em> repository by Dex Horthy / HumanLayer, licensed <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener" target="_blank">CC BY-SA 4.0</a>.</span></figcaption>
+</figure>
+<p>Benefits:</p>
+<ol>
+<li><strong>Self-Healing</strong>: The LLM can read the error message and figure out what to change in a subsequent tool call</li>
+<li><strong>Durable</strong>: The agent can continue to run even if one tool call fails</li>
+</ol>
+<p>I'm sure you will find that if you do this TOO much, your agent will start to spin out and might repeat the same error over and over again. </p>
+<p>That's where <a href="#factor-8">factor 8 - own your control flow</a> and <a href="#factor-3">factor 3 - own your context building</a> come in - you don't need to just put the raw error back on, you can completely restructure how it's represented, remove previous events from the context window, or whatever deterministic thing you find works to get an agent back on track. </p>
+<p>But the number one way to prevent error spin-outs is to embrace <a href="#factor-10">factor 10 - small, focused agents</a>.</p>
+  </section>
+
+  <section id="factor-10">
+    <h2><span class="sec-num">10</span>Factor 10 — Small, Focused Agents</h2>
+<p>Rather than building monolithic agents that try to do everything, build small, focused agents that do one thing well. Agents are just one building block in a larger, mostly deterministic system.</p>
+<figure class="wide">
+<img alt="A pipeline in which an event is summarised, passed to a small boxed agent loop, classified, and routed to one of two further small agent loops. A note reads: 10 to 100 tools, 3 to 10 steps, as part of a larger pipeline." height="788" src="../assets/images/12-factor-agents/factor-10-small-agents.webp" width="1400"/>
+<figcaption><span class="figlabel">Factor 10</span>The scale the factor argues for. The note in the corner is the whole prescription: three to ten steps per agent, inside a pipeline that is otherwise deterministic.
+  <span class="figsrc">From the <em>12-factor agents</em> repository by Dex Horthy / HumanLayer, licensed <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener" target="_blank">CC BY-SA 4.0</a>.</span></figcaption>
+</figure>
+<p>The key insight here is about LLM limitations: the bigger and more complex a task is, the more steps it will take, which means a longer context window. As context grows, LLMs are more likely to get lost or lose focus. By keeping agents focused on specific domains with 3-10, maybe 20 steps max, we keep context windows manageable and LLM performance high.</p>
+<blockquote>
+<p>As context grows, LLMs are more likely to get lost or lose focus</p>
+</blockquote>
+<p>Benefits of small, focused agents:</p>
+<ol>
+<li><strong>Manageable Context</strong>: Smaller context windows mean better LLM performance</li>
+<li><strong>Clear Responsibilities</strong>: Each agent has a well-defined scope and purpose</li>
+<li><strong>Better Reliability</strong>: Less chance of getting lost in complex workflows</li>
+<li><strong>Easier Testing</strong>: Simpler to test and validate specific functionality</li>
+<li><strong>Improved Debugging</strong>: Easier to identify and fix issues when they occur</li>
+</ol>
+<h3>What if LLMs get smarter?</h3>
+<p>Do we still need this if LLMs get smart enough to handle 100-step+ workflows?</p>
+<p>tl;dr yes. As agents and LLMs improve, they <strong>might</strong> naturally expand to be able to handle longer context windows. This means handling MORE of a larger DAG. This small, focused approach ensures you can get results TODAY, while preparing you to slowly expand agent scope as LLM context windows become more reliable. (If you've refactored large deterministic code bases before, you may be nodding your head right now).</p>
+<figure class="wide">
+<img alt="A boxed region drawn around part of a larger pipeline, titled: agent scope grows as LLMs get smarter, with the subtitle that we will always want knobs to make them as accurate as possible." height="879" src="../assets/images/12-factor-agents/agent-scope-grow.webp" width="1400"/>
+<figcaption><span class="figlabel">As models improve</span>Horthy's answer to "won't better models make this unnecessary?" — the box grows, but the reason for drawing a box at all does not go away.
+  <span class="figsrc">From the <em>12-factor agents</em> repository by Dex Horthy / HumanLayer, licensed <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener" target="_blank">CC BY-SA 4.0</a>. Final frame of the source animation.</span></figcaption>
+</figure>
+<p>Being intentional about size/scope of agents, and only growing in ways that allow you to maintain quality, is key here. As the <a href="https://open.substack.com/pub/swyx/p/notebooklm?selection=08e1187c-cfee-4c63-93c9-71216640a5f8&amp;utm_campaign=post-share-selection&amp;utm_medium=web" rel="noopener" target="_blank">team that built NotebookLM put it</a>:</p>
+<blockquote>
+<p>I feel like consistently, the most magical moments out of AI building come about for me when I'm really, really, really just close to the edge of the model capability</p>
+</blockquote>
+<p>Regardless of where that boundary is, if you can find that boundary and get it right consistently, you'll be building magical experiences. There are many moats to be built here, but as usual, they take some engineering rigor.</p>
+  </section>
+
+  <section id="factor-11">
+    <h2><span class="sec-num">11</span>Factor 11 — Trigger from Anywhere</h2>
+<p>If you're waiting for the <a href="https://humanlayer.dev" rel="noopener" target="_blank">humanlayer</a> pitch, you made it. If you're doing <a href="#factor-6">factor 6 - launch/pause/resume with simple APIs</a> and <a href="#factor-7">factor 7 - contact humans with tool calls</a>, you're ready to incorporate this factor.</p>
+<figure class="wide">
+<img alt="Channels on the left — email, Slack, web app embed, Telegram — feeding an agent loop in the centre, which responds out to the same set of channels on the right, labelled multiplayer collaboration." height="788" src="../assets/images/12-factor-agents/factor-11-trigger-anywhere.webp" width="1400"/>
+<figcaption><span class="figlabel">Factor 11</span>The factor is openly the HumanLayer pitch, and this is it: the same agent reachable from wherever the user already is, answering on the same channel.
+  <span class="figsrc">From the <em>12-factor agents</em> repository by Dex Horthy / HumanLayer, licensed <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener" target="_blank">CC BY-SA 4.0</a>.</span></figcaption>
+</figure>
+<p>Enable users to trigger agents from slack, email, sms, or whatever other channel they want. Enable agents to respond via the same channels.</p>
+<p>Benefits:</p>
+<ul>
+<li><strong>Meet users where they are</strong>: This helps you build AI applications that feel like real humans, or at the very least, digital coworkers</li>
+<li><strong>Outer Loop Agents</strong>: Enable agents to be triggered by non-humans, e.g. events, crons, outages, whatever else. They may work for 5, 20, 90 minutes, but when they get to a critical point, they can contact a human for help, feedback, or approval</li>
+<li><strong>High Stakes Tools</strong>: If you're able to quickly loop in a variety of humans, you can give agents access to higher stakes operations like sending external emails, updating production data and more. Maintaining clear standards gets you auditability and confidence in agents that <a href="#factor-10">perform bigger better things</a></li>
+</ul>
+  </section>
+
+  <section id="factor-12">
+    <h2><span class="sec-num">12</span>Factor 12 — Make Your Agent a Stateless Reducer</h2>
+<p>Okay so we're over 1000 lines of markdown at this point. This one is mostly just for fun.</p>
+<figure class="wide">
+<img alt="A loop diagram: a context window enters a determine-next-step node, the chosen step is handled, and the result is folded into a new context window that re-enters the same node." height="788" src="../assets/images/12-factor-agents/factor-12-stateless-reducer.webp" width="1400"/>
+<figcaption><span class="figlabel">Factor 12</span>Factor 12 has almost no text of its own — Horthy calls it "mostly just for fun" — so the diagram carries it. Context in, new context out, same function every turn.
+  <span class="figsrc">From the <em>12-factor agents</em> repository by Dex Horthy / HumanLayer, licensed <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener" target="_blank">CC BY-SA 4.0</a>.</span></figcaption>
+</figure>
+<figure class="wide">
+<img a="" accumulator="" agent="" ai="" alt="A screenshot of a post by Dex Horthy asking what the lispy version of " an="" and="" answering:="" basically="" be,="" context="" determinenextstep="" earlier="" foldl="" for="" framework."="" handle="" height="628" how="" is="" it.="" llm="" loop="" loop"="" not="" on="" plus="" post="" quoted="" reads:="" reducer="" src="../assets/images/12-factor-agents/agent-foldl.webp" statement="" switch="" the="" to="" where="" width="1170" window="" would=""/>
+<figcaption><span class="figlabel">The reducer, stated</span>The one sentence that makes factor 12 a factor rather than a joke. Every other factor is a consequence of taking this shape seriously.
+  <span class="figsrc">From the <em>12-factor agents</em> repository by Dex Horthy / HumanLayer, licensed <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener" target="_blank">CC BY-SA 4.0</a>.</span></figcaption>
+</figure>
+  </section>
+
+  <section id="factor-13">
+    <h2><span class="sec-num">13</span>Factor 13 — Pre-fetch All the Context You Might Need</h2>
+<p>If there's a high chance that your model will call tool X, don't waste token round trips telling the model to fetch it, that is, instead of a pseudo-prompt like:</p>
+<pre><code class="language-jinja">When looking at deployments, you will likely want to fetch the list of published git tags,
+so you can use it to deploy to prod.
+
+Here's what happened so far:
+
+{{ thread.events }}
+
+What's the next step?
+
+Answer in JSON format with one of the following intents:
+
+{
+  intent: 'deploy_backend_to_prod',
+  tag: string
+} OR {
+  intent: 'list_git_tags'
+} OR {
+  intent: 'done_for_now',
+  message: string
+}
+</code></pre>
+<p>and your code looks like</p>
+<pre><code class="language-python">thread = {"events": [initial_message]}
+next_step = await determine_next_step(thread)
+
+while True:
+  switch next_step.intent:
+    case 'list_git_tags':
+      tags = await fetch_git_tags()
+      thread["events"].append({
+        type: 'list_git_tags',
+        data: tags,
+      })
+    case 'deploy_backend_to_prod':
+      deploy_result = await deploy_backend_to_prod(next_step.data.tag)
+      thread["events"].append({
+        "type": 'deploy_backend_to_prod',
+        "data": deploy_result,
+      })
+    case 'done_for_now':
+      await notify_human(next_step.message)
+      break
+    # ...
+</code></pre>
+<p>You might as well just fetch the tags and include them in the context window, like:</p>
+<pre><code class="language-diff">- When looking at deployments, you will likely want to fetch the list of published git tags,
+- so you can use it to deploy to prod.
+
++ The current git tags are:
+
++ {{ git_tags }}
+
+
+Here's what happened so far:
+
+{{ thread.events }}
+
+What's the next step?
+
+Answer in JSON format with one of the following intents:
+
+{
+  intent: 'deploy_backend_to_prod',
+  tag: string
+- } OR {
+-   intent: 'list_git_tags'
+} OR {
+  intent: 'done_for_now',
+  message: string
+}
+
+</code></pre>
+<p>and your code looks like</p>
+<pre><code class="language-diff">thread = {"events": [initial_message]}
++ git_tags = await fetch_git_tags()
+
+- next_step = await determine_next_step(thread)
++ next_step = await determine_next_step(thread, git_tags)
+
+while True:
+  switch next_step.intent:
+-    case 'list_git_tags':
+-      tags = await fetch_git_tags()
+-      thread["events"].append({
+-        type: 'list_git_tags',
+-        data: tags,
+-      })
+    case 'deploy_backend_to_prod':
+      deploy_result = await deploy_backend_to_prod(next_step.data.tag)
+      thread["events"].append({
+        "type": 'deploy_backend_to_prod',
+        "data": deploy_result,
+      })
+    case 'done_for_now':
+      await notify_human(next_step.message)
+      break
+    # ...
+</code></pre>
+<p>or even just include the tags in the thread and remove the specific parameter from your prompt template:</p>
+<pre><code class="language-diff">thread = {"events": [initial_message]}
++ # add the request
++ thread["events"].append({
++  "type": 'list_git_tags',
++ })
+
+git_tags = await fetch_git_tags()
+
++ # add the result
++ thread["events"].append({
++  "type": 'list_git_tags_result',
++  "data": git_tags,
++ })
+
+- next_step = await determine_next_step(thread, git_tags)
++ next_step = await determine_next_step(thread)
+
+while True:
+  switch next_step.intent:
+    case 'deploy_backend_to_prod':
+      deploy_result = await deploy_backend_to_prod(next_step.data.tag)
+      thread["events"].append(deploy_result)
+    case 'done_for_now':
+      await notify_human(next_step.message)
+      break
+    # ...
+</code></pre>
+<p>Overall:</p>
+<blockquote>
+<p>If you already know what tools you'll want the model to call, just call them DETERMINISTICALLY and let the model do the hard part of figuring out how to use their outputs</p>
+</blockquote>
+<p>Again, AI engineering is all about <a href="#factor-3">Context Engineering</a>.</p>
+  </section>
+
+  <section id="glossary">
+    <h2><span class="sec-num">14</span>Glossary</h2>
+<p>Terms the guide uses without stopping to define. This section is the one
+part of the page not written by the author.</p>
+
+<dl class="glossary">
+  <dt>Agent</dt>
+  <dd>As the guide defines it: a prompt, a switch statement, an accumulating context window
+  and a loop. Not a framework, and not necessarily autonomous.</dd>
+
+  <dt>BAML</dt>
+  <dd>A domain-specific language for writing LLM prompts and their expected return types as
+  ordinary source files. The guide uses it for the factor 2 example, and says any templating
+  approach works as well.</dd>
+
+  <dt>Context window</dt>
+  <dd>The block of text a model sees on a single call — instructions, retrieved documents,
+  and the history of what has happened so far. Everything the model knows in that moment.</dd>
+
+  <dt>DAG — directed acyclic graph</dt>
+  <dd>A graph of steps with arrows between them and no way back to a step you have left.
+  The shape of an ordinary program, and of the pipelines Airflow and Prefect run.</dd>
+
+  <dt>Determine next step</dt>
+  <dd>The guide's name for the single model call at the heart of the loop: given everything
+  that has happened, return structured JSON saying what to do next.</dd>
+
+  <dt>foldL / reducer</dt>
+  <dd>A function that walks a sequence carrying an accumulator, combining each element into
+  it. Factor 12's claim is that an agent is exactly this, with the context window as the
+  accumulator.</dd>
+
+  <dt>Inner loop / outer loop</dt>
+  <dd>Inner-loop agents are started by a human in a conversation. Outer-loop agents are
+  started by an event, a cron or a webhook, and reach for a human only when they need one.</dd>
+
+  <dt>MCP — Model Context Protocol</dt>
+  <dd>A standard for exposing tools and data to a model. The guide explicitly declines to
+  discuss it, in its second disclaimer.</dd>
+
+  <dt>Micro agent</dt>
+  <dd>A small agent — three to ten steps — embedded in a larger deterministic pipeline,
+  rather than an agent that owns the whole workflow.</dd>
+
+  <dt>Structured output / tool call</dt>
+  <dd>JSON emitted by a model in a shape your code can parse. Factor 4's argument is that
+  these two names describe the same thing.</dd>
+
+  <dt>Thread</dt>
+  <dd>The guide's term for the serialisable list of events — messages, tool calls, results,
+  errors — that makes up a run. Factor 5 argues it should be the only state you keep.</dd>
+</dl>
+  </section>
+
+  <section id="sources">
+    <h2><span class="sec-num">15</span>Sources</h2>
+<p>The original lives at <a href="https://github.com/humanlayer/12-factor-agents" target="_blank" rel="noopener">github.com/humanlayer/12-factor-agents</a> and is still being edited. This copy is pinned to commit <code>d20c728</code>, rendered 1 August 2026.</p>
+<p>Written by <strong>Dex Horthy</strong> with contributors at <a href="https://humanlayer.dev" target="_blank" rel="noopener">HumanLayer</a>. The author credits early feedback from @iantbutler01, @tnm, @hellovai, @stantonk, @balanceiskey, @AdjectiveAllison, @pfbyjy, @a-churchill and the SF MLOps community, and thanks everyone who has contributed to the repository since.</p>
+<p>All content and images are licensed <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA 4.0</a>; code is licensed <a href="https://www.apache.org/licenses/LICENSE-2.0" target="_blank" rel="noopener">Apache 2.0</a>. This page is a redistribution under the same terms.</p>
+<h3>The author's own list of related resources</h3>
+<ul>
+<li>Contribute to this guide <a href="https://github.com/humanlayer/12-factor-agents" rel="noopener" target="_blank">here</a></li>
+<li><a href="https://youtu.be/8bIHcttkOTE" rel="noopener" target="_blank">I talked about a lot of this on an episode of the Tool Use podcast</a> in March 2025</li>
+<li>I write about some of this stuff at <a href="https://theouterloop.substack.com" rel="noopener" target="_blank">The Outer Loop</a></li>
+<li>I do <a href="https://github.com/hellovai/ai-that-works/tree/main" rel="noopener" target="_blank">webinars about Maximizing LLM Performance</a> with <a href="https://github.com/hellovai" rel="noopener" target="_blank">@hellovai</a></li>
+<li>We build OSS agents with this methodology under <a href="https://github.com/got-agents/agents" rel="noopener" target="_blank">got-agents/agents</a></li>
+<li>We ignored all our own advice and built a <a href="https://github.com/humanlayer/kubechain" rel="noopener" target="_blank">framework for running distributed agents in kubernetes</a></li>
+<li>Other links from this guide:</li>
+<li><a href="https://12factor.net" rel="noopener" target="_blank">12 Factor Apps</a></li>
+<li><a href="https://www.anthropic.com/engineering/building-effective-agents#agents" rel="noopener" target="_blank">Building Effective Agents (Anthropic)</a></li>
+<li><a href="https://thedataexchange.media/baml-revolution-in-ai-engineering/" rel="noopener" target="_blank">Prompts are Functions</a></li>
+<li><a href="https://tomasp.net/blog/2015/library-frameworks/" rel="noopener" target="_blank">Library patterns: Why frameworks are evil</a></li>
+<li><a href="https://sandimetz.com/blog/2016/1/20/the-wrong-abstraction" rel="noopener" target="_blank">The Wrong Abstraction</a></li>
+<li><a href="https://github.com/dexhorthy/mailcrew" rel="noopener" target="_blank">Mailcrew Agent</a></li>
+<li><a href="https://www.youtube.com/watch?v=f_cKnoPC_Oo" rel="noopener" target="_blank">Mailcrew Demo Video</a></li>
+<li><a href="https://x.com/chainlit_io/status/1858613325921480922" rel="noopener" target="_blank">Chainlit Demo</a></li>
+<li><a href="https://www.linkedin.com/posts/dexterihorthy_llms-typescript-aiagents-activity-7290858296679313408-Lh9e" rel="noopener" target="_blank">TypeScript for LLMs</a></li>
+<li><a href="https://www.boundaryml.com/blog/schema-aligned-parsing" rel="noopener" target="_blank">Schema Aligned Parsing</a></li>
+<li><a href="https://www.vellum.ai/blog/when-should-i-use-function-calling-structured-outputs-or-json-mode" rel="noopener" target="_blank">Function Calling vs Structured Outputs vs JSON Mode</a></li>
+<li><a href="https://github.com/boundaryml/baml" rel="noopener" target="_blank">BAML on GitHub</a></li>
+<li><a href="https://docs.llamaindex.ai/en/stable/examples/llm/openai_json_vs_function_calling/" rel="noopener" target="_blank">OpenAI JSON vs Function Calling</a></li>
+<li><a href="https://theouterloop.substack.com/p/openais-realtime-api-is-a-step-towards" rel="noopener" target="_blank">Outer Loop Agents</a></li>
+<li><a href="https://airflow.apache.org/" rel="noopener" target="_blank">Airflow</a></li>
+<li><a href="https://www.prefect.io/" rel="noopener" target="_blank">Prefect</a></li>
+<li><a href="https://dagster.io/" rel="noopener" target="_blank">Dagster</a></li>
+<li><a href="https://www.inngest.com/" rel="noopener" target="_blank">Inngest</a></li>
+<li><a href="https://www.windmill.dev/" rel="noopener" target="_blank">Windmill</a></li>
+<li><a href="https://aiagentindex.mit.edu/" rel="noopener" target="_blank">The AI Agent Index (MIT)</a></li>
+<li><a href="https://open.substack.com/pub/swyx/p/notebooklm?selection=08e1187c-cfee-4c63-93c9-71216640a5f8" rel="noopener" target="_blank">NotebookLM on Finding Model Capability Boundaries</a></li>
+</ul>
+  </section>
+
+
+  <footer class="colophon">
+    <p>Reproduced in the AI Library on 03 August 2026, in full and under the source&#x27;s own licence — the words are the author&#x27;s, not this library&#x27;s.</p>
+    <p>This page is a faithful copy of an outside source, not an explanation written from one. Read the <a href="https://github.com/humanlayer/12-factor-agents" target="_blank" rel="noopener">original repository</a> for the living version, the code samples in context, and the discussion around them.</p>
+    <p><a href="../index.html">← Back to the library</a></p>
+  </footer>
+
+</main>
+
+<script src="../assets/app.js"></script>
+
+
+</body>
+</html>
