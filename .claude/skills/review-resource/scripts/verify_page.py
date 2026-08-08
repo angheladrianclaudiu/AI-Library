@@ -31,13 +31,14 @@ from __future__ import annotations
 
 import argparse
 import functools
+import os
 import subprocess
 import sys
 import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[4]
-CHROMIUM = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome"
+CHROMIUM = os.environ.get("AI_LIBRARY_CHROMIUM")
 VIEWPORTS = [(1280, 900, "desktop"), (390, 844, "phone")]
 SEARCH = "#search"
 
@@ -88,7 +89,10 @@ def main() -> int:
     time.sleep(1.5)
     try:
         with sync_playwright() as pw:
-            browser = pw.chromium.launch(executable_path=CHROMIUM, args=["--no-sandbox"])
+            launch = {"args": ["--no-sandbox"]}
+            if CHROMIUM:
+                launch["executable_path"] = CHROMIUM
+            browser = pw.chromium.launch(**launch)
             for width, height, label in VIEWPORTS:
                 for theme in ("light", "dark"):
                     ctx = browser.new_context(viewport={"width": width, "height": height})

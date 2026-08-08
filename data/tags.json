@@ -1,15 +1,20 @@
 [
   "agents",
+  "ai-policy",
+  "alignment",
   "benchmarks",
   "code-quality",
   "coding-agents",
+  "compute",
   "context-engineering",
   "evaluation",
+  "forecasting",
   "long-horizon",
   "memory",
   "production",
   "prompting",
   "rag",
+  "scaling",
   "survey",
   "transformers"
 ]

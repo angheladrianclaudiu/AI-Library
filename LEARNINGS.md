@@ -446,6 +446,194 @@ was a remote hotlink**; the "offline edition" claim in its masthead covers the t
 
 ---
 
+## Session 7 — Situational Awareness: The Decade Ahead (situational-awareness.ai)
+
+**Source:** 165 pages, ~52,000 words, 21.4 MB. A **Tufte-style LaTeX book**
+(`tufte-book`: narrow main text column, wide side margin carrying captions and
+footnotes), five essays plus an appendix. 39 figures, **almost all embedded rasters**
+— matplotlib plots exported to PNG, two photographs, one DALL-E illustration.
+Also the first *forecast* in the library rather than a technique or a result, and the
+first source old enough (June 2024) to be scored against what actually happened.
+
+**What worked first time:**
+
+- **The embedded pass did the whole job.** 42 candidates for 39 figures, essentially
+  1:1, at full resolution, every one cropped correctly because there was no cropping
+  to do. The exact inverse of session 3, where 40 embedded candidates were all junk.
+  The discriminator is how the figures were *made*: session 3's were vector diagrams
+  decorated with icons, these are pre-rendered rasters dropped into the document.
+- **`MIN_SIDE`/`MIN_AREA` produced no false positives**, despite the margin layout
+  giving plenty of opportunity for stray rules and glyph runs.
+- **The two rendered-region crops were both clean**, and one of them —
+  `fig-p39-figure-19` — was *better* than the embedded halves, capturing both panels
+  of a two-panel figure as one image where the embedded pass gave two separate files.
+  Worth checking for: when a figure has stacked panels, the region render may be the
+  right choice even when embedded copies exist.
+
+**What broke:**
+
+1. **Every caption came back empty.** Not one of the 42 candidates had a caption,
+   because this class sets captions in the *side margin*, level with the artwork, not
+   in the band beneath it. The region pass matched only 2 of 39. Recovering the
+   figure-number-to-page mapping meant reading the body text and matching each
+   `Figure N:` marker to a page myself. **New failure mode**, and a common layout.
+   Logged in `TASKS.md`.
+2. **All three metadata heuristics failed at once, and the PDF already held the right
+   answers.** `pdf_metadata` in the text JSON carried the correct title, the correct
+   single author and a `creationDate` of `D:20240606`. The heuristics returned
+   `"S I T U AT I O N A L AWA R E N E S S"` (letter-spaced display type reported with
+   literal spaces between glyphs), an empty `authors`, and **year 2027** — scraped from
+   the essay's own argument, not from the document. Sessions 2 and 3 recorded author
+   detection failing quietly; this adds a *year* that is confidently wrong and
+   plausible-looking, on a page where the year is the whole point. **Check the year by
+   eye too, not just the author.**
+3. **The word count over-reported by roughly a third.** 52,173 counted, but this book's
+   margins carry very extensive footnotes — some pages are more footnote than body. Same
+   species as session 3's bibliography problem, different cause, and it pushes the
+   depth decision the same wrong way.
+
+**Non-extraction findings:**
+
+- **The figure-contradicts-the-prose pattern held for the fourth source in a row, and
+  this time it mattered.** Figure 16 (METR agentic tasks) is the essay's single best
+  piece of *evidence*, and the prose describes it as "5% → 20% → nearly 40%" via better
+  scaffolding. The plot shows AutoGPT at ~15% and the chat harness at ~21% — both
+  *below* the plainly-prompted `basic gpt-4-0613` at ~30%. The envelope does rise, but
+  the tidy monotone story is not what was measured. Four for four now: **read every
+  figure against the sentence that cites it, as a matter of course.**
+- **A figure can also contradict itself.** Figure 19's top panel is labelled "GPT-2
+  (2019) to GPT-4 (**2024**)" while its lower panel's window is "**2023**–2027" — the
+  same model dated two different years inside one image, and the body text uses 2023
+  throughout.
+- **A dated forecast wants a scorecard section, and it is the most valuable thing on
+  the page.** Everything else on this page a reader could get from the original; "here
+  is what has and has not happened" they cannot. It also disciplined the writing:
+  scoring the predictions forced me to notice that I had explained the buildout chapter
+  *without* its revenue arithmetic, while the scorecard was scoring the revenue
+  prediction — a coherence hole that only appeared because the two sections had to agree.
+- **A forecast needs the author's position disclosed, not just their argument.** This
+  document contains explicit investment advice, mentions being "all-in leveraged long
+  Nvidia", and its author launched a fund on the thesis afterwards. None of that makes
+  the arithmetic wrong and none of it belongs in a hit piece; it belongs in one sentence
+  where the reader can weigh it.
+- **Where the essay was right and wrong falls into a clean pattern worth stating on the
+  page:** mechanisms (test-time compute, verifiable-reward RL, electricity as the
+  binding constraint) did well; institutions did worse in both directions; competitors
+  did worst, and failed by underestimating them. Sorting the misses by *kind* said more
+  than listing them.
+- **Five new tags at once.** The vocabulary was entirely LLM-engineering
+  (`agents`, `rag`, `prompting`…) and nothing covered a forecasting/strategy essay.
+  13 → 18. First sign the library has more than one subject.
+
+**Tooling notes for this environment:**
+
+- **`verify_page.py` cannot run on Windows** — its Chromium path is a hardcoded Linux
+  location. Re-implemented the same assertions in the scratchpad to get them run; all
+  passed (no overflow, 8/8 images decode, anchors resolve, toggle flips and persists,
+  search and the tag chip both narrow to one card, 4/4 tables scroll on phone). Logged.
+- **Playwright is installed and works on Windows** at
+  `%LOCALAPPDATA%\ms-playwright\chromium-1208`; omitting `executable_path` finds it.
+- **Google Fonts is *not* blocked here**, unlike sessions 2–4. Screenshots render in the
+  real faces, so local screenshots can verify typography on this machine.
+- **`ElementHandle.screenshot()` times out on a tall element** ("waiting for element to
+  be stable") — the scorecard table hit the 30s default. Scroll with an absolute
+  `window.scrollTo` and take a *viewport* shot instead.
+- **A screenshot taken mid-smooth-scroll looks like a sticky-header bug.** One capture
+  put the header at y≈590 with dead space above it. It is a capture artifact: inject
+  `* { scroll-behavior: auto !important }`, jump, wait, then assert
+  `header.getBoundingClientRect().top === 0` before believing a layout defect. Nearly
+  chased a non-bug for the second time in the project's history.
+
+---
+
+## Session 8 — reviewing the situational awareness page (no new ingest)
+
+**Source:** the session 7 page itself, 14 sections and ~9,900 words, re-checked against
+`situationalawareness.pdf`. Unlike session 4 the ingest's `inbox/` was still intact, so the
+content JSON, the figures JSON and the 21 MB PDF were all present — no recovery needed, and
+a rebuild-and-diff proved the JSON byte-exact before anything was touched. Two adversaries
+briefed independently, then every finding adjudicated against the source or the browser.
+
+**What the review found:**
+
+1. **The page's sharpest criticism of the source was false, and it was false in the caption
+   of the figure that disproves it.** The Figure 19 caption said unhobbling is entered as a
+   question mark "yet the headline claim adds all three columns together", and `limitations`
+   repeated it as "Summing a question mark". The essay does no such thing: the figure brackets
+   compute and algorithmic efficiency alone as "base scaleup", p.38 says "4.5–6 OOM base
+   effective compute scaleup … **plus** major 'unhobbling' gains", and Figure 1's own caption
+   (p.8) reads "this graph shows only the scaleup in base models; 'unhobblings' are not
+   pictured." The essay is *scrupulous* about the thing the page accused it of. **A critical
+   judgement is a claim, and it decays the same way a number does** — the page's §02 and §03
+   prose stated the relationship correctly, so the defect was a compression that survived in
+   the two places written last and read first.
+2. **Three reversals of the source's position, each contradicted by the page's own prose
+   elsewhere.** `limitations` said the essay "argues for maximum speed" when it argues for a
+   lead precisely so that part of it can be spent on caution (p.137–138, "cash in parts of the
+   lead", "delaying by 6 months in the middle of the intelligence explosion") — and §09 says so
+   correctly. The scorecard scored "Superalignment receives a far more concerted effort" as a
+   failed prediction when p.125 makes it a *demand* and predicts the default will hold, so the
+   essay was marked down for an outcome it forecast. And the China row's word "**remain**"
+   turned a June-2024 snapshot into a forecast, when the essay's actual forecast (p.134, "They
+   will be a formidable adversary") has aged well. **When a page contradicts itself, the
+   summary/verdict end is the wrong one** — the body was right all three times.
+3. **The recurring undefined-basics failure, in its purest form yet.** `artificial general
+   intelligence` appeared **zero** times on a page that used "AGI" sixteen times, put it in the
+   hook, the meta description and a section title, and glossed it only at ~8,600 words inside a
+   table cell. Same for "superintelligence" (13 uses, no definition), "inference" (used for a
+   headline 3-OOM number, absent from the glossary), and RLHF (expanded in the glossary, never
+   in the body). Session 4 recorded this for `token` and `chain-of-thought`; it is now four for
+   four. **The glossary is what hides it** — nineteen entries looked thorough while the page's
+   single most-used acronym had none.
+4. **A figure undercount the page could see.** The Figure 16 caveat said "Two of the named
+   agent harnesses score below the plainly-prompted model"; LangChain ReAct is a third, plainly
+   visible in the image directly above the sentence. Both adversaries and I read that image;
+   only the craft agent counted.
+5. **Invented essay ordinals.** The page opened "165 pages, in five parts" (correct: I, II,
+   III, IV, V) and then numbered chapters "the third essay" … "the sixth essay", which are
+   really IIIa–IIId, sub-chapters of the third part — while its own scorecard column used the
+   correct IIIa/IIIb/IIIc/IIId labels and never explained them. Three notations, no key. Found
+   independently by me and by the craft agent, which is the strongest signal the review produced.
+
+**What held up.** Everything numeric. Gulf War casualties, Table 4 and Table 5 cell by cell,
+the Marcellus gas arithmetic, the test-time compute table, the growth-modes table, all fifteen
+bibliography entries, every `figsrc` page number, all eight `alt` texts, and roughly forty
+quoted figures. Both of session 7's deliberate critical readings survived independent checking
+against the images: Figure 16 really does put AutoGPT and the chat harness below the
+plainly-prompted model, and Figure 19 really does date GPT-4 to 2024 in one panel and open at
+2023 in the other. **The page was accurate about its source's numbers and wrong about its
+source's argument** — the exact inverse of session 4, where the numbers slipped and the
+judgements held.
+
+**On running adversaries, again.** Both over-reported, as designed, and the rejections were
+instructive. The craft agent's counts — 37 "not X but Y" constructions, 26 authorial
+superlatives, 101 em-dashes in 9,897 words — are real measurements and were still rejected:
+rewriting a 10,000-word page for cadence risks introducing errors into prose that is otherwise
+correct, and the guide's "device used twice is voice" line does not obviously make ten per
+thousand a defect. Also rejected: the "In short" block duplicating §1 (a summary block is
+allowed to restate, same reasoning as session 4's glossary rejection) and callout density
+(in line with `llm-field-guide`). **I nearly filed a false finding of my own** — the page says
+"the 40 rigs already running in the Marcellus", which reads like an error until you find the
+source's parenthetical "(the current rig count in the Marcellus)" on p.84. Checking the primary
+occurrence saved it, for the second review running.
+
+**Tooling notes for this environment:**
+
+- **`verify_page.py` now runs on Windows.** Fixed rather than worked around: `executable_path`
+  is passed only when `AI_LIBRARY_CHROMIUM` is set, so Playwright resolves its own bundled
+  Chromium. Session 7 re-implemented the harness in a scratchpad to get the checks run and
+  logged the fix; doing the fix took about a minute and retires the workaround permanently.
+- **An intact `inbox/` makes a review dramatically cheaper.** No `recover_content_json.py`, no
+  `git show` of a large blob, no round-trip guesswork — just rebuild and diff. Worth asking the
+  ingest session to leave `inbox/` in place when a review is expected to follow.
+- **Extracting the PDF text once, with `=== PAGE N ===` markers, is what makes findings
+  actionable.** Every accepted fidelity finding cites a page number from those markers; the two
+  rejected ones could not.
+- **Windows `python` writing source excerpts to stdout dies on `cp1252`.** Wrap stdout in a
+  UTF-8 `TextIOWrapper` with `errors='replace'` before printing anything pulled out of a PDF.
+
+---
+
 ## Session template
 
 ```
