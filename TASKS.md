@@ -51,6 +51,26 @@ source that caused it.
 - [ ] **Dedupe heuristic is crude.** `drop_redundant_regions()` compares a region against
       embedded image rects by area overlap at a fixed 0.85 threshold. Fine so far; will
       misfire on a figure that is a raster with vector annotations drawn over it.
+- [ ] **Margin captions defeat the caption matcher entirely.** Session 7's source is a
+      Tufte-style LaTeX book, which sets `Figure N:` captions in a wide side margin rather
+      than beneath the artwork. Every one of the 42 candidates came back with an empty
+      `caption`, and the region pass matched only 2 of the source's 39 figures. The
+      figure-number-to-page mapping had to be rebuilt by hand by reading the body text. The
+      layout is common — `tufte-book`, `tufte-handout`, and most O'Reilly-style trade
+      typesetting. Fix: detect a persistent narrow text column offset from the main block
+      and search it for caption patterns before falling back to the below-artwork band.
+- [ ] **The PDF's own metadata is ignored when it is right.** Session 7's `pdf_metadata`
+      block carried `title: "Situational Awareness"`, `author: "Leopold Aschenbrenner"` and
+      `creationDate: D:20240606` — all correct — while the heuristics returned the
+      letter-spaced `"S I T U AT I O N A L AWA R E N E S S"`, an empty author string, and
+      the year **2027** (a year scraped from the argument, not the document). The extractor
+      already reads and stores `doc.metadata`; it just does not consult it. Fix: prefer a
+      non-empty, plausible `doc.metadata` field over the heuristic, and report when the two
+      disagree so the mismatch is visible rather than silent.
+- [ ] **Letter-spaced display type breaks the title heuristic.** LaTeX title pages often
+      set the title with wide tracking, which PyMuPDF reports as literal spaces between
+      glyphs. Cheap fix: when the largest-text candidate is mostly single-character tokens,
+      collapse the intra-word spacing before accepting it.
 
 ## Article branch
 
@@ -97,7 +117,19 @@ source that caused it.
       nothing. The field guide's context-engineering chapter shipped in exactly that state
       after unsourced claims were stripped and no replacement was added. A cheap heuristic:
       warn when a section is over ~300 words, contains no `class="cit"`, and is not the
-      glossary or the sources list.
+      glossary or the sources list. **Second justification, session 8:** the situational
+      awareness page's `scorecard` is ~700 words, carries every claim the page makes about
+      what happened *after* the source was written, and cites nothing — the one section a
+      reader most needs to check is the one with no apparatus. The heuristic would have fired.
+- [ ] **A page that scores a dated source needs a second kind of citation.** The retrospective
+      section of a forecast page makes claims about the world, not about the source, so the
+      bibliography — which lists what the *source* leaned on — cannot support them and
+      `verify_page.py`'s dangling/unused checks pass trivially. Session 8 found four
+      outside-the-document claims sitting in prose that reads as sourced (the author's age,
+      his dismissal, Ilya Sutskever's departure, the fund launched afterwards), one of which
+      was simply wrong. Options: a distinct `biblio` block for post-publication sources, or a
+      convention that such claims are marked in the text. Either way the writing guide should
+      say that a scorecard's evidence is the page's own responsibility.
 - [ ] **Personal notes block.** A place for your own commentary on a resource, visually
       distinct from the explanation, so the page is not purely a summary.
 - [ ] **`make_page.py` does not validate citations.** It should fail when an
@@ -174,9 +206,27 @@ source that caused it.
       the script docstrings is written `python3`; on Windows only `python` resolves, and the
       shim prints a Microsoft Store advert instead of failing usefully. Either write plain
       `python`, or say once at the top that Windows users should substitute it.
+- [x] **`verify_page.py` cannot run on Windows.** It hardcoded
+      `CHROMIUM = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome"` and passed it as
+      `executable_path`, so the repo's only browser-assertion harness failed immediately on
+      a Windows checkout, where Playwright installs under `%LOCALAPPDATA%\ms-playwright`.
+      Session 7 re-implemented the same checks in a scratchpad script to get them run; session
+      8 fixed the script instead. `executable_path` is now only passed when the
+      `AI_LIBRARY_CHROMIUM` env var is set, so Playwright resolves its own bundled browser by
+      default and the pinned-path case the constant was written for still works.
+- [ ] **The depth rubric has no row for a multi-part source.** `SKILL.md` tops out at
+      "20–30 min (~5,000–8,000 words)" for "a dense methods paper, or a long-form essay".
+      Session 7's source is *five* essays totalling ~52,000 words across 165 pages; covering
+      each argument, plus a retrospective, came to ~9,900 words / 45 min. Compressing to the
+      ceiling would have meant dropping a source chapter or reducing arguments to assertions,
+      which the writing guide forbids elsewhere. Add a row for a book-length or multi-part
+      source, or say explicitly that the ceiling is per-argument rather than per-page.
 - [ ] **Tag vocabulary needs curating.** `data/tags.json` grows monotonically and nothing
       ever merges near-duplicates. Revisit once there are ~20 resources. Session 6 added
-      `prompting` and `production`, taking it to 13.
+      `prompting` and `production`, taking it to 13; session 7 added `scaling`, `compute`,
+      `forecasting`, `alignment` and `ai-policy`, taking it to 18. That jump is the vocabulary
+      meeting its first resource that is not about building with LLMs — worth checking at the
+      next non-technical ingest whether `scaling`/`compute` should merge.
 - [ ] **Batch ingest.** One resource per run is right for quality, but a queue mode for
       several PDFs at once would save repeated setup.
 - [ ] **Enable GitHub Pages** — Settings → Pages → Deploy from a branch → `main` / root.
