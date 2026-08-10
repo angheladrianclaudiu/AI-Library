@@ -71,6 +71,26 @@ source that caused it.
       set the title with wide tracking, which PyMuPDF reports as literal spaces between
       glyphs. Cheap fix: when the largest-text candidate is mostly single-character tokens,
       collapse the intra-word spacing before accepting it.
+- [x] **`find_arxiv_id()` could confidently identify the wrong paper.** It searched the
+      *entire* document text for an `arXiv:NNNN.NNNNN` pattern and returned the first match,
+      with no check that the match was near the front matter where a paper's own
+      self-identification lives. On the Claude Opus 5 System Card — a corporate PDF with no
+      arXiv presence at all — it matched a footnote three pages in, citing an unrelated paper
+      ("Lee, S., & Brumley, D. (2026). ExploitBench... arXiv:2605.14153"), and confidently set
+      `source_url` to that paper's abstract page. Worse than session 2/3/7's
+      empty-or-wrong-author findings, because a plausible wrong URL reads as more trustworthy
+      than an honestly empty field. **Fixed session 9**: `extract_pdf.py` now calls
+      `find_arxiv_id(head)` (the same first-4000-characters front-matter slice already used
+      for `find_year`) instead of `find_arxiv_id(full_text)`. Regression-tested against the
+      same source: `source_url` now comes back `null` instead of the wrong paper's link.
+- [x] **`extract_pdf.py`'s own summary print crashed on Windows cp1252 when extracted text
+      contained a non-cp1252 character** (a literal zero-width space, U+200B, inside a title,
+      surfaced this in session 9). Session 8 fixed this for *review* scripts printing
+      excerpts; the extractor's own `main()` still wrote its final `json.dumps(...)` straight
+      to stdout with no UTF-8 wrapper. **Fixed session 9**: `main()` now calls
+      `sys.stdout.reconfigure(encoding="utf-8", errors="replace")` before anything is printed.
+      Regression-tested: the same PDF now extracts cleanly with no `PYTHONIOENCODING` env var
+      set.
 
 ## Article branch
 
@@ -135,6 +155,20 @@ source that caused it.
 - [ ] **`make_page.py` does not validate citations.** It should fail when an
       `<a class="cit" href="#rN">` has no matching `<li id="rN">`, rather than leaving it
       to the checklist.
+- [ ] **A class one level off from the CSS selector's expected nesting fails completely
+      silently — three instances in one session.** `figure.wide` on the `<img>` inside a
+      figure instead of the `<figure>` itself; `blockquote cite` written as a sibling
+      `<p><cite>…</cite></p>` right after `</blockquote>` instead of inside it; `.figsrc`
+      used on a `<p>` under a table instead of inside a `<figcaption>`. All three produce no
+      error, no visual difference an author would flag from memory, and no console warning —
+      only a computed-style/geometry check (`getBoundingClientRect().width`,
+      `getComputedStyle(...).fontSize`) catches them, because the wrong nesting still parses
+      as valid HTML and just never matches the selector. Worth a real fix rather than three
+      more entries here: either have `make_page.py` walk the generated HTML and warn on
+      `img.wide`, `cite` not inside `blockquote`, and `.figsrc`/`.figlabel` outside
+      `figcaption`, or add a `verify_page.py` assertion that checks computed styles for every
+      instance of each scoped class against a plain control element, the way session 9's
+      review caught these.
 - [ ] **SlopCodeBench's bibliography is uncited.** `verify_page.py` reports all five entries
       (`r1`–`r5`) as cited by nothing: the page carries no `class="cit"` markers at all, so
       its Sources section reads as a further-reading list rather than an apparatus. Either
@@ -180,6 +214,13 @@ source that caused it.
 
 ## Process
 
+- [x] **`assets/scripts/` is now a documented convention.** Session 9 committed
+      `assets/scripts/claude-opus-5-system-card.build_content.py` — a per-resource Python
+      script that regenerates the gitignored content JSON, so the page can be reproduced
+      without the source PDF. Formalized in `CLAUDE.md`'s "Conventions that matter" rather
+      than left as a one-off; it's still an authoring tool inside the tree GitHub Pages
+      serves (a partial answer to the item below, not a full one — the content JSON itself
+      still doesn't survive in history, only the means to regenerate it).
 - [ ] **A published page cannot be regenerated from a fresh clone.** `.gitignore:9`
       matches `*.content.json` repo-wide, so the content JSON — the only editable
       representation of a page — never enters history. `pages/*.html` is generated and
