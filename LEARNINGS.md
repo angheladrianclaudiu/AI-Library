@@ -634,6 +634,172 @@ occurrence saved it, for the second review running.
 
 ---
 
+## Session 9 — Claude Opus 5 System Card (Anthropic)
+
+**Source:** 193 pages, ~50,900 words, 16.0 MB. A Google Docs export ("Producer: Skia/PDF m152
+Google Docs Renderer") of Anthropic's own pre-deployment safety and capability report for a
+frontier model — a third distinct production pipeline for this library, after arXiv LaTeX and a
+Tufte-style book. 97 embedded raster charts, no vector diagrams. Not on arXiv; not on any public
+paper index at all.
+
+**What worked first time:**
+
+- **The embedded-image pass did the whole job, cleanly.** 97 candidates, virtually all legitimate
+  bar/scatter charts, with none of session 3's icon-decoration pollution — a Google Docs chart has
+  no page-corner logos or clipart glued onto it, so `MIN_SIDE`/`MIN_AREA` needed no help at all.
+  First source where the embedded pass alone was both necessary *and* sufficient with zero manual
+  filtering of junk candidates.
+- **`pdf_metadata` carried the right title** ("Claude Opus 5 System Card"), same as session 7's
+  situational-awareness — a Google Docs export apparently writes clean metadata the way a
+  well-formed LaTeX build does.
+- **Year detection landed correctly** (2026, matching the July 24, 2026 cover date) — the first
+  source since session 7 flagged year detection as a recurring failure point where it didn't fail.
+
+**What broke:**
+
+1. **`find_arxiv_id()` returned a confidently wrong `source_url`, for a new reason.** This
+   document has no arXiv presence — it's hosted directly at `www-cdn.anthropic.com` — but its
+   text cites dozens of other arXiv papers in footnotes. The regex has no positional constraint,
+   so it matched the *first* `arXiv:NNNN.NNNNN`-shaped string anywhere in 326,000 characters of
+   body text: a footnote three pages in, citing an unrelated cybersecurity benchmark paper. The
+   extractor reported this as the document's own `source_url` with full confidence. This is a
+   worse failure than sessions 2/3/7's empty-or-wrong-author findings: an empty field is obviously
+   broken, but a plausible link to the wrong paper is not, and would have shipped straight to a
+   published page's colophon if not checked. Caught by reading the PDF's own embedded hyperlinks
+   (all pointed at `anthropic.com`, none at arxiv.org) and by grepping the extracted text for the
+   actual match context, which turned out to sit inside a citation, not a self-identification. No
+   arXiv-style pattern appeared anywhere near the front matter. **Logged in TASKS.md** — the fix
+   is to bound the search to the first page or two of text, since a preprint's own arXiv ID is
+   always there and never buried in a mid-document footnote. Because the environment cannot browse
+   the open web to verify a canonical URL and the PDF's own links only reached a generic
+   `/system-cards` index page, the correct `source_url` had to come from the user directly.
+2. **The title carried a literal zero-width space** (U+200B) between "Card:" and "Claude" — a
+   Google Docs line-wrap-control artifact that the largest-text-on-page-1 heuristic picked up
+   verbatim, even though `pdf_metadata`'s title field was already clean. Same failure class as
+   session 7 ("the PDF's own metadata is ignored when it is right"), but the visible symptom this
+   time is an invisible character rather than a garbled string — it doesn't show up on a terminal
+   dump or a rendered screenshot, only in a raw character-by-character read of the JSON. Worked
+   around by using the `pdf_metadata` title directly rather than the heuristic's.
+3. **`extract_pdf.py` itself crashes on Windows** when its own final summary `json.dumps(...)`
+   contains a non-cp1252 character (here, that same zero-width space) — `UnicodeEncodeError` on
+   stdout, not on any downstream review script. Session 8 fixed this class of bug for scripts that
+   print *excerpts*; the extractor's own `main()` still needs it. Worked around with
+   `PYTHONIOENCODING=utf-8` set on every invocation touching this PDF, including the extractor.
+   **Logged in TASKS.md.**
+
+**Non-extraction findings:**
+
+- **`class="wide"` on an `<img>` instead of its `<figure>` fails completely silently.** The CSS
+  selector is `figure.wide`; the class on the wrong element produces no error and no visible
+  difference — the figure just never escapes the reading measure, and nothing about the rendered
+  page looks wrong enough to notice by eye. Caught only by scripting
+  `getBoundingClientRect().width` against a plain (non-wide) figure for comparison. **Logged in
+  TASKS.md** — this is an easy misread of the writing guide's own wording ("add `class="wide"`
+  for a figure...") and worth a make_page.py warning.
+- **A redundant byline is a real defect, not a style nit.** Setting both `authors` and `venue` to
+  the same organization ("Anthropic") rendered as "Anthropic · Anthropic · 2026" — the `venue`
+  field exists to name a *distinct* publisher (compare `12-factor-agents`: authors "Dex Horthy and
+  contributors", venue "HumanLayer"), and should simply be omitted when the author and publisher
+  are the same entity. Caught by reading the rendered byline, not by reading the schema.
+- **The Browser pane's screenshot tool was unavailable this session** ("not displayed, so the page
+  is not compositing frames") while navigation, JS execution and network inspection all worked
+  normally. Every check in this session's verification pass — overflow, image load, TOC anchor
+  resolution, citation resolution, table-scroll behavior, wide-figure width, theme-toggle
+  persistence, search and tag filtering — was done through `javascript_tool` computed-geometry
+  queries instead of visual inspection. Worth recording as a working fallback path, in the same
+  spirit as session 7's Windows-Chromium fix for `verify_page.py`: when a visual check is
+  unavailable, the same assertions can usually be made a different way rather than skipped.
+- **A 193-page source is well outside every existing depth-rubric row**, same problem TASKS.md
+  already records from session 7's five-essay source. Selecting six figures out of 97 candidates
+  and covering nine of the source's numbered sections in twelve of the page's own, at ~6,800
+  words, meant treating entire subsections (most of the capabilities section's dozens of
+  benchmarks) as material to sample from rather than transcribe — the right call for a source this
+  size, but it is a judgment call the rubric gives no guidance on making.
+
+**Pre-publication review, same session.** Before anything was committed, an Opus-5-model subagent
+was briefed with a single combined fidelity-plus-craft thesis (rather than `review-resource`'s usual
+two blind, independent agents) and given the page, the extracted source text with page markers, the
+content JSON, the figures JSON and the writing guide. Every finding it returned was independently
+re-verified against the source text before acting on it, per the review skill's adjudication step.
+
+**What the single-combined-agent approach cost and bought.** Skipping the two-blind-agent protocol
+traded away the "two independent passes that agree is evidence" signal — there was no second pass to
+corroborate against. What it kept: every finding still had to cite a page number and quote exact page
+text, and every one of the twelve fidelity findings it returned held up against the source on
+independent re-check, none rejected. For a same-session pre-publication pass with the source still in
+the working tree (no reconstruction needed), one well-briefed pass reading in full appears to be
+enough; the two-agent protocol's real value is likely sharpest when the page is old enough that the
+reviewer's memory of writing it can no longer substitute for a second opinion.
+
+**What broke, worst first:**
+
+1. **A competitor score was attributed to the wrong model.** Table 8.1.A's "Other models" column is
+   headed "GPT 5.6 Sol"; the page's summary table labelled the OSWorld 2.0 figure in that column
+   "Muse Spark 1.1" instead — a transcription slip made while re-typing a multi-column source table
+   into a three-column page table, with nothing to catch a column-header mismatch once the number
+   itself was correct. Muse Spark's real OSWorld score (47.3%, visible in Figure 8.12.3.A on p174) is
+   23 points lower than the number actually being labelled with its name.
+2. **A caption called Opus 4.8 "four-generations-old"**, when the source's own AECI chart (the exact
+   figure the caption sits under) shows Opus 4.8 as the point immediately before Opus 5 on the trend
+   line, and the page's own §1 separately calls it "the model it replaces." The error contradicted a
+   figure on the same page and a sentence earlier in the same document — the kind of internal
+   inconsistency that survives because two true-sounding phrases about "how much better than the
+   old model" get written independently and never cross-checked against each other.
+3. **A qualitative "review" was upgraded from an LLM judge to the ARC Prize Foundation itself.** The
+   source is explicit that the game-transcript analysis was "produced by an LLM judge reviewing the
+   model's transcript," shared *by* the Foundation rather than authored by it — a meaningful
+   distinction on a page whose own limitations section is specifically about model-graded evidence
+   being weaker than independent evidence, so the page had unknowingly undermined its own caveat.
+4. **A benchmark was attributed to the wrong vendor.** BenchCAD (Zhang et al., arXiv:2605.10865, no
+   Surge AI involvement) got folded into a "built by Surge AI" list alongside Chartography and
+   GDP.pdf, which are Surge AI benchmarks; RiemannBench, the Surge AI benchmark actually cited two
+   pages earlier in the same source, is what the sentence needed. Two names starting to blur after
+   close reading of a source with a dozen similarly-named third-party evals is an easy way to swap
+   one out for a neighbor.
+5. **Five more understatement/overstatement findings, all real, all smaller**: "matching every other
+   model tested" erased a named exception (Haiku 4.5) the source states explicitly two sentences
+   later in the same paragraph; "a request the document says it is passing along verbatim" claimed a
+   direct quotation the source never makes (it's Anthropic's own paraphrase); "two independent Opus 5
+   attempts" dropped the source's own framing that this was one early snapshot run twice at different
+   effort settings; "more often than Opus 4.8" was attached to a claim the source only quantifies
+   comparatively for a different, adjacent behavior in the same sentence; and "57 professional
+   biologists" upgraded a labor-market baseline ("the leading edge of the US ML-bio labor market")
+   into a specific profession the source never names. **The common thread across all twelve: every
+   one compresses a source claim by exactly the amount that makes it read more impressive or more
+   dramatic than the source states** — never the reverse. Worth watching for as a category, not just
+   as twelve unrelated slips.
+6. **A markup bug reappeared in a new shape.** Both blockquote attributions were written as a sibling
+   `<p><cite>…</cite></p>` immediately after `</blockquote>` instead of inside it, so
+   `blockquote cite`'s styling rule never matched and both citations rendered as 17px upright body
+   serif — indistinguishable from ordinary prose — patched with an inline `margin-top` hack that only
+   existed to compensate for spacing the missing rule would have handled. Structurally identical to
+   this same session's earlier `class="wide"`-on-the-`<img>`-instead-of-the-`<figure>` mistake: a
+   CSS selector scoped to a specific parent-child relationship, and markup that puts the class one
+   level off from where the selector expects it. Two instances of the same failure shape in one
+   session is worth a general lesson: **when a component's CSS selector requires specific nesting
+   (`blockquote cite`, `figure.wide`, `figcaption .figsrc`), get the nesting from the writing guide's
+   example verbatim rather than reproducing the visual shape from memory** — a sibling element with
+   the right tag name looks identical in the JSON and works nowhere.
+7. **A `class="figsrc"` note was placed outside any `figcaption`** (as a source line under a table,
+   not a figure), so `figcaption .figsrc`'s styling never applied there either — same root cause as
+   above, on a class this library has no non-figure component for at all. Fixed by dropping the
+   invented markup and writing an ordinary paragraph instead, per the guide's own preference for
+   prose over invented structure.
+
+**What was found and deliberately not changed:** em-dash density (108 across ~6,800 words, 14
+paragraphs carrying 3–4 each) was flagged as a craft finding but left alone, on the same reasoning
+[[LEARNINGS.md]] session 8 already recorded for a comparable count on situational-awareness: no
+established threshold makes a given density a defect, and reworking cadence across 14 paragraphs
+risks introducing new errors for a stylistic preference rather than a correctness problem. Recorded
+here rather than silently dropped, so a future review doesn't have to re-relitigate it from scratch.
+
+**Non-review finding:** the subagent flagged, correctly, that the newly-created `assets/scripts/`
+directory (holding this page's content-JSON builder script, added at the user's explicit request one
+turn after publication planning) ships an authoring tool inside the tree GitHub Pages serves, with no
+mention anywhere in `CLAUDE.md` of the convention. It's a deliberate, user-directed choice for this
+one resource rather than an established pattern yet — logged in TASKS.md as an open question rather
+than resolved unilaterally.
+
 ## Session template
 
 ```

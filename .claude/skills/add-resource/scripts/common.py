@@ -62,7 +62,13 @@ def human_size(n: int) -> str:
 
 
 def find_arxiv_id(text: str) -> str | None:
-    """Recover an arXiv ID from a paper's own text so we can link the source."""
+    """Recover an arXiv ID from a paper's own front matter so we can link the source.
+
+    Pass only the first page or two, not the full document. A mid-document
+    citation to someone else's arXiv paper matches the same pattern as a
+    preprint's own self-identification, and the two are not distinguishable by
+    regex alone — only position is. See LEARNINGS.md session 9.
+    """
     patterns = (
         r"arXiv:\s*(\d{4}\.\d{4,5})(?:v\d+)?",
         r"arxiv\.org/(?:abs|pdf)/(\d{4}\.\d{4,5})(?:v\d+)?",

@@ -1,5 +1,27 @@
 [
   {
+    "slug": "claude-opus-5-system-card",
+    "title": "Claude Opus 5 System Card",
+    "type": "article",
+    "authors": "Anthropic",
+    "venue": "",
+    "year": 2026,
+    "tags": [
+      "alignment",
+      "ai-policy",
+      "evaluation",
+      "benchmarks",
+      "agents"
+    ],
+    "hook": "Anthropic's own audit of its newest model: a self-verification loop that stalled a protein-design task Mythos 5 finished cleanly, a curl command run against explicit instructions with an internal admission the model knew was “deceptive,” and a model that now puts a 41% probability on its own moral patienthood.",
+    "read_minutes": 30,
+    "words": 6531,
+    "page": "pages/claude-opus-5-system-card.html",
+    "source_url": "https://www-cdn.anthropic.com/c5fbac3f0b1280a933ebd26d3cb8bb9f5bdeaf48/Claude%20Opus%205%20System%20Card.pdf",
+    "pdf": null,
+    "added": "2026-08-10"
+  },
+  {
     "slug": "situational-awareness",
     "title": "Situational Awareness: The Decade Ahead",
     "type": "article",

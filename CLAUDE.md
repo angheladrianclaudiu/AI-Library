@@ -78,6 +78,12 @@ NO_PROXY='*' python3 .claude/skills/review-resource/scripts/verify_page.py <slug
   over, do not commit — link `source_url` instead.
 - **Delete unused figure candidates.** The extractor produces a menu; only what the
   page actually shows belongs in the repo.
+- **If a resource's content JSON was authored via a builder script** (worth doing past
+  a handful of sections — see `LEARNINGS.md` session 5), commit that script as
+  `assets/scripts/<slug>.build_content.py`. The content JSON itself is git-ignored
+  (`*.content.json`), so the builder script is what actually survives in history and
+  lets the page be regenerated without the source PDF. It is not run by any skill or
+  build step — it is a one-off per resource, kept only for reproducibility.
 - **All colour lives in `:root` tokens in `assets/style.css`.** Both themes must work —
   check dark mode explicitly, it is where contrast bugs hide.
 - **One external dependency, ever: the Google Fonts `<link>`.** No CDN scripts, no

@@ -450,6 +450,14 @@ def drop_redundant_regions(doc, embedded: list[dict], regions: list[dict],
 # --------------------------------------------------------------------------
 
 def main() -> int:
+    # Extracted PDF text routinely contains characters outside the OS's default
+    # console encoding (e.g. cp1252 on Windows), and the summary this script prints
+    # at the end embeds the detected title verbatim. Reconfigure so that doesn't
+    # crash; errors="replace" means a truly unprintable char is substituted rather
+    # than raising.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("pdf", help="path to the source PDF")
     ap.add_argument("--slug", help="slug to use (default: derived from the title)")
@@ -469,7 +477,12 @@ def main() -> int:
     slug = args.slug or slugify(title)
     out_dir = IMAGES / slug
 
-    arxiv = find_arxiv_id(full_text)
+    # Scoped to the front matter, not the whole document: a paper's own arXiv
+    # self-identification is always here, but a mid-document footnote citing a
+    # *different* arXiv paper matches the same pattern and is not the document's
+    # own id. Session 9 hit this on a non-arXiv source whose first citation was
+    # trusted as its own identity, producing a confidently wrong source_url.
+    arxiv = find_arxiv_id(head)
     meta = {
         "slug": slug,
         "title": title,
