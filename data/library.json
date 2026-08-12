@@ -1,5 +1,26 @@
 [
   {
+    "slug": "stealing-reasoning-traces",
+    "title": "Stealing Reasoning Traces from Proprietary LLM APIs",
+    "type": "paper",
+    "authors": "Alexander Panfilov, David Schmotz, Ilia Shumailov, Luca Beurer-Kellner, Joachim Schaeffer, Ameya Prabhu, Jonas Geiping, and Maksym Andriushchenko",
+    "venue": "arXiv preprint",
+    "year": 2026,
+    "tags": [
+      "security",
+      "alignment",
+      "ai-policy",
+      "agents"
+    ],
+    "hook": "Providers hide a reasoning model’s chain-of-thought behind an encrypted blob you pass back with every request — and that blob turns out to be readable by any weaker, less-guarded model from the same provider. The authors used the gap to pull 315,320 hidden reasoning traces out of publicly shared agent logs, recover live API keys and other credentials, and find early behavioral evidence that a couple of open-weight models may already answer suspiciously like Claude and GPT-5.6 mid-thought.",
+    "read_minutes": 25,
+    "words": 5572,
+    "page": "pages/stealing-reasoning-traces.html",
+    "source_url": "https://arxiv.org/abs/2608.09867",
+    "pdf": null,
+    "added": "2026-08-12"
+  },
+  {
     "slug": "claude-opus-5-system-card",
     "title": "Claude Opus 5 System Card",
     "type": "article",
