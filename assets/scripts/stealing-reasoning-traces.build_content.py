@@ -641,6 +641,7 @@ content = {
     "hook": hook,
     "tldr": tldr,
     "source_url": "https://arxiv.org/abs/2608.09867",
+    "added": "2026-08-12",
     "sections": sections,
 }
 

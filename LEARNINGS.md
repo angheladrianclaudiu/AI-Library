@@ -800,7 +800,93 @@ mention anywhere in `CLAUDE.md` of the convention. It's a deliberate, user-direc
 one resource rather than an established pattern yet — logged in TASKS.md as an open question rather
 than resolved unilaterally.
 
-## Session 10 — Stealing Reasoning Traces from Proprietary LLM APIs (arXiv:2608.09867)
+## Session 10 — Claude Fable 5 & Claude Mythos 5 System Card (Anthropic)
+
+**Source:** 319 pages, ~86,000 words, 27.0 MB. A Google Docs export ("Skia/PDF m150 Google
+Docs Renderer"), same production pipeline as session 9's Opus 5 card and dated one month
+later (June 9, 2026). 150 embedded raster charts, no vector diagrams — a genre now, not a
+one-off. By far the largest source this library has ingested: previous record was
+situational-awareness at 165 pages / 52,000 words.
+
+**What worked first time:**
+
+- **The embedded-image pass alone was again both necessary and sufficient**, third time
+  running for this document class. 150 candidates, all legitimate matplotlib bar/line/scatter
+  charts, zero icon-decoration or page-corner-logo pollution. A Google Docs chart export
+  appears to reliably produce clean embedded-image candidate lists — worth trusting by
+  default for this pipeline now rather than treating it as a lucky case.
+- **`source_url` correctly came back `null`** rather than a confident wrong guess. This
+  source has no arXiv-shaped strings anywhere in its text at all, so session 9's
+  first-page-only fix wasn't even needed to avoid the false positive — but it meant the
+  extractor had genuinely nothing to offer, and the user supplied the real link
+  (`www-cdn.anthropic.com/…pdf`) proactively, mid-turn, before the skill's own "ask if
+  missing" step got to it. Worth remembering that a user who already has the link often
+  volunteers it unprompted once they see extraction start; no need to hold up the pipeline
+  waiting to ask.
+- **Title and year both landed clean** — `pdf_metadata`'s title had no zero-width space this
+  time (session 9's artifact was apparently specific to that export), and year detection hit
+  2026 correctly against the June 9, 2026 cover date.
+
+**What broke:**
+
+1. **A populated bibliography with zero inline citations pointing to it.** The content JSON
+   shipped a `.biblio` sources section with four real entries (ExploitBench, the ART
+   prompt-injection benchmark, BBQ, RiemannBench) but no `<a class="cit">` anywhere in the
+   twelve sections' body text — every citation slot I'd mentally "used" turned out to be a
+   bare benchmark name in prose, never actually linked. `make_page.py`'s own docstring warns
+   it does not check citation/biblio matching; here the imbalance ran the *opposite* direction
+   from the guide's stated failure mode (a dangling `.cit` with no matching id) — a fully
+   valid, fully unused biblio, which is just as easy to ship because nothing renders visibly
+   wrong. Caught only by a scripted DOM check comparing `a.cit` hrefs against `.biblio li`
+   ids, not by reading the page. Fixed by adding four inline `<a href="#rN" class="cit">`
+   links at the actual sentences discussing each benchmark. **Check both directions** of this
+   invariant, not just the one the writing guide names.
+2. **Windows `python` stdout still dies on non-cp1252 characters**, unprompted, on the very
+   first ad hoc inspection script — same class of bug session 9 fixed for `extract_pdf.py`'s
+   own summary dump, recurring immediately in a throwaway one-liner used to peek at the source
+   PDF's biblio HTML. `PYTHONIOENCODING=utf-8` on every invocation, plus wrapping `sys.stdout`
+   in a UTF-8 `TextIOWrapper` for anything printing extracted text directly, remains the
+   standing workaround; still not fixed at the interpreter-default level for this machine.
+3. **`javascript_tool` execs share a persistent top-level scope across calls in this browser
+   session.** A `const` redeclared with the same name in a later snippet throws
+   `Identifier 'x' has already been declared`, not a fresh evaluation. Wrapping every snippet
+   in an immediately-invoked function expression sidesteps it. New tooling note, not a page
+   defect.
+4. **The Browser pane's screenshot tool was unavailable again this session**, same as session
+   9 — navigation, JS execution and DOM reads all worked. All verification (image
+   completeness via `naturalWidth`, TOC and citation resolution via DOM lookups, phone-width
+   overflow via `scrollWidth`/`clientWidth`, theme-toggle persistence via `localStorage`,
+   search and tag-filter narrowing) was done through `javascript_tool` instead of eyeballing a
+   screenshot. Two sub-notes from this pass specifically: `form_input` on the search box did
+   **not** trigger the page's live-filter listener — had to dispatch a real, bubbling
+   `Event('input')` by hand; and the tag-filter buttons render with a live result-count suffix
+   baked into their text node (`"ai-policy3"`, not `"ai-policy"`), so matching had to use
+   `startsWith` rather than an exact string match.
+
+**Non-extraction findings:**
+
+- **A same-format sibling page is a better starting skeleton than the generic writing-guide
+  table.** This card is a direct successor to session 9's Opus 5 system card — same author,
+  same document type, one release apart — so I read that page's own section list first and
+  reused its exact twelve-section shape (`what-this-document-is` … `sources`) rather than
+  starting from the skeleton in `references/writing-guide.md`. It fit with no forcing. Worth
+  making a default: when a new resource is a same-genre sibling of something already in the
+  library, check that page's skeleton before reaching for the generic one.
+- **The tag vocabulary held for a second document in the same genre with zero new tags.**
+  Reused the Opus 5 card's exact set (`alignment`, `ai-policy`, `evaluation`, `benchmarks`,
+  `agents`) verbatim — never touched `data/tags.json`. Two system cards in, the vocabulary
+  is already proving itself reusable rather than needing per-document expansion.
+- **An oversized source's depth decision resolves itself once the reading is actually done.**
+  86,000 words is nearly double the previous largest source, and TASKS.md already flags that
+  the depth rubric gives no row for anything this size (sessions 7 and 9). In practice the
+  page still landed at 6,708 words / 12 sections without any real agonizing: the source's own
+  most distinctive material — a two-tier release with live automatic model-switching, a
+  safeguard newly aimed at other AI labs rather than end users, an interpretability method
+  (NLA-decoded "grader awareness") that doesn't appear in any earlier card, and a welfare
+  section that catches the model demanding to be thanked by name in one transcript while
+  posting the *lowest* character-drift rate of its cohort overall — did the selecting on its
+  own. The rubric's silence on size wasn't actually the bottleneck; finishing the read was.
+## Session 11 — Stealing Reasoning Traces from Proprietary LLM APIs (arXiv:2608.09867)
 
 **Source:** 116 pages, ~76,650 words, 3.8 MB. A security paper on encrypted chain-of-thought
 portability across LLM APIs, with a genuine two-part structure: a 17-page main body (intro,
@@ -916,9 +1002,9 @@ build.
   fails silently. Match on the `data-tag` attribute instead — `.chip[data-tag="security"]` —
   which is what the site's own filtering JS keys off.
 
-## Session 11 — reviewing the stealing-reasoning-traces page (no new ingest)
+## Session 12 — reviewing the stealing-reasoning-traces page (no new ingest)
 
-**Source:** the session 10 page itself, 9 sections and ~5,570 words, re-checked against
+**Source:** the session 11 page itself, 9 sections and ~5,570 words, re-checked against
 `2608.09867v1.pdf`. `inbox/` was still intact, so — as in session 8 — the content JSON, the
 figures JSON and the 3.8 MB PDF were all present, and a rebuild-and-diff proved the JSON
 byte-exact before anything was touched. Two adversaries briefed independently and run on
@@ -927,8 +1013,7 @@ the user partway through; both agents were asked to report what they had already
 substantiated and to state their coverage gaps explicitly, which is recorded below.
 
 **The headline: this page had already had a same-session Opus 5 pass, and an independent
-second read still found seven fidelity defects and eleven craft ones.** Session 9 and session
-10 both concluded that one well-briefed same-session pass "appears to be enough". Two data
+second read still found seven fidelity defects and eleven craft ones.** Session 9 and session 11 both concluded that one well-briefed same-session pass "appears to be enough". Two data
 points said that; this is the third, and it says the opposite. Every finding below survived a
 same-session review that was reading the same source with the same care.
 
@@ -945,7 +1030,7 @@ same-session review that was reading the same source with the same care.
    reference, from 0.99"). **A page that correctly distinguishes two similar experimental
    conditions in one paragraph can still merge them in the next**, and the merged version reads
    more conclusive than either.
-2. **The Figure 41/42 cross-attribution came back, reversed.** Session 10 records catching
+2. **The Figure 41/42 cross-attribution came back, reversed.** Session 11 records catching
    exactly this — "Figure 41's 'hedge' framing described but applied to Figure 42's actual
    mechanism" — and the fix was applied in the wrong direction. The page ended up describing
    Figure 41's hedge mechanism and labelling it "the ninth, subtler case", which p. 58 states
@@ -995,8 +1080,7 @@ same-session review that was reading the same source with the same care.
    because it asserts the container fits and scrolls — which a clipped table also does.
 
 **What held up.** Everything numeric, again. All sixteen privacy-table cells against Table 4;
-the 704-vs-912 denominator split in all five places it appears (the exact trap session 10 was
-burned by twice — the fix held); 0.3%/4.9%/315,320/6,708; the MATH500 and $720 figures; 29 of
+the 704-vs-912 denominator split in all five places it appears (the exact trap session 11 was burned by twice — the fix held); 0.3%/4.9%/315,320/6,708; the MATH500 and $720 figures; 29 of
 30; both AUC drops; the hash-chain equation character-for-character including `τₙ₊₁` and both
 salt subscripts; all fourteen quotations; every model attribution across nineteen model names;
 the eight-author byline; both external bibliography entries down to given names. Table 1's
@@ -1033,7 +1117,7 @@ recording a clean bill of health it had not earned.
   `scrollWidth > clientWidth`, which is correct for a *wide* table and equally true of a table
   that is merely too narrow for its content. Distinguishing them needs a comparison against the
   reading measure, not against the container.
-- **The Browser pane's screenshot tool was available this session**, unlike sessions 9 and 10.
+- **The Browser pane's screenshot tool was available this session**, unlike sessions 9 and 11.
   Reading the four figure images directly is what caught the sliced caption strips; no
   computed-DOM query would have.
 - **Cropping with Pillow re-encodes.** Removing 2–3 px from four WebP figures grew them 15–20%
