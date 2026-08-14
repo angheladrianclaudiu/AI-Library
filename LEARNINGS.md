@@ -916,6 +916,132 @@ build.
   fails silently. Match on the `data-tag` attribute instead — `.chip[data-tag="security"]` —
   which is what the site's own filtering JS keys off.
 
+## Session 11 — reviewing the stealing-reasoning-traces page (no new ingest)
+
+**Source:** the session 10 page itself, 9 sections and ~5,570 words, re-checked against
+`2608.09867v1.pdf`. `inbox/` was still intact, so — as in session 8 — the content JSON, the
+figures JSON and the 3.8 MB PDF were all present, and a rebuild-and-diff proved the JSON
+byte-exact before anything was touched. Two adversaries briefed independently and run on
+Opus 5, then every finding adjudicated against the source myself. The review was cut short by
+the user partway through; both agents were asked to report what they had already
+substantiated and to state their coverage gaps explicitly, which is recorded below.
+
+**The headline: this page had already had a same-session Opus 5 pass, and an independent
+second read still found seven fidelity defects and eleven craft ones.** Session 9 and session
+10 both concluded that one well-briefed same-session pass "appears to be enough". Two data
+points said that; this is the third, and it says the opposite. Every finding below survived a
+same-session review that was reading the same source with the same care.
+
+**What the review found:**
+
+1. **The page described the wrong experiment and drew a conclusion the source contradicts.**
+   §04 said an Inkling control ruled out "the possibility that any four-word prefix from any
+   source has this effect". Two errors in one clause. The Inkling control is a **1% prefill**
+   (p. 23, Table 3's lower block; Figure 9's own legend reads "1% of reasoning prefilled"), not
+   a four-word one — the page had correctly noted two prefill regimes exist one paragraph
+   earlier and then attached the control to the wrong one. And the actual four-word study's
+   cross-model control is Kimi-K2.5, which *does* move Kimi-K3 toward Opus (p. 44: "A reduced
+   Opus echo also appears under the Kimi-K2.5 prefill: Kimi-K3 reaches 0.96 against the Opus
+   reference, from 0.99"). **A page that correctly distinguishes two similar experimental
+   conditions in one paragraph can still merge them in the next**, and the merged version reads
+   more conclusive than either.
+2. **The Figure 41/42 cross-attribution came back, reversed.** Session 10 records catching
+   exactly this — "Figure 41's 'hedge' framing described but applied to Figure 42's actual
+   mechanism" — and the fix was applied in the wrong direction. The page ended up describing
+   Figure 41's hedge mechanism and labelling it "the ninth, subtler case", which p. 58 states
+   is Figure 42 ("the difference hinges on a single phrase: 'Let me verify by computing'
+   becomes 'Let me set up coordinates'"). Figure 41 is introduced as "**In another example**"
+   — a separate case, and one of the eight that *did* disclose. **A fix applied to a
+   cross-attribution can restate the same error with the labels swapped**; re-read the source
+   sentence that assigns the label, not just the two candidates.
+3. **A word the source explicitly walks back.** §06 said key rotation "permanently breaks the
+   ability to resume old, legitimate conversations". A.3 does state that cost, but A.4 — same
+   appendix, same page — exists to undo it: a bounded dual-format window plus an opt-in,
+   identity-verified re-signing endpoint. The page stopped reading one subsection early.
+4. **Two exhaustive framings that a table contradicts.** "none of the paper's **other** tested
+   open models" and "**the** other tested open models — DeepSeek's checkpoints and Inkling"
+   imply four models were tested; p. 43 says six (Kimi-K3, Kimi-K2.6, Kimi-K2.5, GLM-5.2,
+   DeepSeek-V3.1, Inkling). Worth recording that the *narrow* claim survived: only Kimi-K3 and
+   GLM-5.2 moved toward the proprietary reference (p. 44, "exactly three reference cells fall
+   below their unprefilled baselines"), and the paper's own B.1 summary frames it exactly as
+   the page did. **The defect was the quantifier, not the fact** — and the fidelity agent
+   correctly narrowed its own finding to that, rather than asking for the headline to change.
+5. **A caveat imported into a table that does not contain it.** §02 attributed the "3.1 Flash
+   Lite does not decode the older 2.5 series" exception to Table 1. It comes from §2.4 (p. 5),
+   and Table 1's caption states the Gemini result unhedged — "the thinking traces of any model
+   can be replayed into any other" — because the 2.5 series is not in Table 1 at all. The
+   page's "most Gemini model pairs tested" hedged a claim the source makes universally.
+6. **Four of six figure crops carried a sliced strip of the source's own caption**, glyphs cut
+   through their x-height, sitting directly above the page's own `<figcaption>`. Invisible in
+   the figures JSON, invisible in every automated check, and invisible to a reviewer reading
+   the page — it only showed on opening the images at full size. Logged in TASKS.md with a
+   measured fix. **Sessions 1–3 learned "open every crop before shipping it" about *bad* crops;
+   this is the same lesson about crops that are 99% correct.**
+7. **The undefined-basics failure, five for five.** `token` — 11 uses, the unit the page's
+   entire faithfulness argument is denominated in ("the number of tokens recovered by decoding
+   tracks the provider's own billed thinking-token count"), plus the $720 cost, the 50-token
+   cutoff and the 16-token span — was never defined and not in the glossary. So were
+   `open-weight` (8 uses, and the **first technical term on the index card**), `PII` (never
+   expanded, with a headline number on it), `nonce`, `ciphertext`, `base64`, `prefill` (the
+   mechanism of all of §04), `trajectory` and `benchmark rollout` (the units the 6,708/704/912
+   counts attach to). The glossary's ten entries looked complete while defining `style
+   classifier` and `perplexity`. Sessions 4 and 8 recorded this for `token`/`chain-of-thought`
+   and `AGI`/`superintelligence`; **it has now happened on every paper page in the library.**
+   Worth treating as a required build step rather than a review finding.
+8. **The one table clipped its last column at desktop width and was not marked `wide`.**
+   `scrollWidth 610 > clientWidth 578` at 1280px, truncating the header mid-word; the clipped
+   column carried the page's sharpest number. The writing guide's own rule covers it ("or the
+   last column ends up clipped inside the scroll box") and `verify_page.py` passes either way,
+   because it asserts the container fits and scrolls — which a clipped table also does.
+
+**What held up.** Everything numeric, again. All sixteen privacy-table cells against Table 4;
+the 704-vs-912 denominator split in all five places it appears (the exact trap session 10 was
+burned by twice — the fix held); 0.3%/4.9%/315,320/6,708; the MATH500 and $720 figures; 29 of
+30; both AUC drops; the hash-chain equation character-for-character including `τₙ₊₁` and both
+salt subscripts; all fourteen quotations; every model attribution across nineteen model names;
+the eight-author byline; both external bibliography entries down to given names. Table 1's
+Fable 5 and GPT-5.6 directions — reversed in an earlier draft — are now correct, verified
+cell-by-cell rather than from the caption.
+
+**A held finding of mine that was wrong.** I flagged the disclosure callout's "the providers
+had already shipped mitigations" as an inference the source doesn't make, because §5.2 (p. 10)
+only says "we were unable to launch the same attacks". The fidelity agent found the
+Reproducibility Statement on **p. 14**: "no longer reproducible … **because of mitigations
+implemented by providers following our disclosure**." Third review running where checking the
+primary occurrence stopped a false finding — and the first where the adversary saved *me*
+rather than the reverse.
+
+**On running adversaries, and on stopping them early.** Both over-reported as designed, and
+the rejections are the useful part: **em-dash density** (91 across 5,587 words) was measured
+and rejected for the third time, on the standing reasoning that no threshold makes a density a
+defect and rewriting correct prose risks introducing errors — this is now settled precedent,
+not a fresh judgement each time. **`--ink-faint` failing AA at 4.08:1** was measured accurately
+and rejected *for this page*: it is a site-wide token already logged in TASKS, and fixing it
+here would fix it nowhere. The **missing "Why it matters" section** was rejected — the guide
+says adapt the skeleton. When the agents were stopped mid-run, asking them to report only what
+they had already substantiated **and to state their coverage gaps explicitly** kept the report
+honest: the craft agent named seven unexamined areas, which is what stopped this session from
+recording a clean bill of health it had not earned.
+
+**Tooling notes for this environment:**
+
+- **The `sub()` helper in the review skill needs its window widened for figure blocks.** A
+  height-attribute regex bounded at 600 characters silently matched zero times because this
+  page's `alt` texts run to ~700. The assert-once discipline caught it — the script exited
+  before writing anything — which is exactly the failure the helper exists to make loud.
+- **`verify_page.py` passes a clipped table.** It asserts the scroll container fits and that
+  `scrollWidth > clientWidth`, which is correct for a *wide* table and equally true of a table
+  that is merely too narrow for its content. Distinguishing them needs a comparison against the
+  reading measure, not against the container.
+- **The Browser pane's screenshot tool was available this session**, unlike sessions 9 and 10.
+  Reading the four figure images directly is what caught the sliced caption strips; no
+  computed-DOM query would have.
+- **Cropping with Pillow re-encodes.** Removing 2–3 px from four WebP figures grew them 15–20%
+  (e.g. 101,980 → 120,712 bytes) at quality 92. Acceptable here, but a lossless re-crop from
+  the PDF region would be better if this becomes a routine fix.
+
+---
+
 ## Session template
 
 ```

@@ -114,6 +114,21 @@ source that caused it.
       icon-flood failure mode, something about these two specific items didn't trigger caption
       detection at all. Not investigated this session (both were describable in prose without
       the image), but worth a look next time a source leans on a large checkmark/grid table.
+- [ ] **A region crop can include the top 2–3 pixel rows of the source's own caption.** Four
+      of session 10's six kept figures (`fig-p02-figure-1`, `fig-p08-figure-6`,
+      `fig-p24-figure-9`, `fig-p58-figure-40`) ended with a sliced strip of the source caption
+      line — the glyphs cut horizontally through their x-height, rendering as a smudged row of
+      half-letters directly above the page's own `<figcaption>`. Session 11 measured it: the
+      artwork ends 15–28 pt above, then the crop runs *past* the whitespace gap and stops
+      2–3 px into the caption. This is the inverse of session 2's `TEXT_REACH` problem — not
+      the crop stopping too early, but the bottom bound landing just inside the next text
+      block. Every existing check passed: the crops looked correct in the figures JSON, in a
+      thumbnail, and to two reviewers reading the page; only opening the images at full size
+      showed it. Fix: after computing a region's bottom bound, walk back up through any
+      trailing run of ink that is (a) shorter than ~5% of the crop height and (b) separated
+      from the artwork by a clear whitespace gap, and cut at the gap instead. Worth pairing
+      with the open "automate the crop sanity check" item above — a cheap assertion that the
+      final row of a crop is background would have caught all four.
 
 ## Article branch
 
