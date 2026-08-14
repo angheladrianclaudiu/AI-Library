@@ -886,6 +886,245 @@ situational-awareness at 165 pages / 52,000 words.
   section that catches the model demanding to be thanked by name in one transcript while
   posting the *lowest* character-drift rate of its cohort overall — did the selecting on its
   own. The rubric's silence on size wasn't actually the bottleneck; finishing the read was.
+## Session 11 — Stealing Reasoning Traces from Proprietary LLM APIs (arXiv:2608.09867)
+
+**Source:** 116 pages, ~76,650 words, 3.8 MB. A security paper on encrypted chain-of-thought
+portability across LLM APIs, with a genuine two-part structure: a 17-page main body (intro,
+mechanism, four attack vectors, mitigations, conclusion) followed by 95 pages of appendices —
+a proposed cryptographic defense (3 pp.), a secondary distillation-evidence study on
+open-weight models (30 pp., **not mentioned anywhere in the abstract or intro**), extraction
+technical details (10 pp.), a privacy-labeling methodology writeup (5 pp.), and 50 pages of raw
+decoded-reasoning examples. 44 figure candidates, all vector charts from a clean arXiv LaTeX
+build.
+
+**What worked first time:**
+
+- **All six kept figure crops were clean on first inspection**, spanning pages 2 through 58 —
+  early-body diagrams, a bar chart, and a mid-appendix scatter plot alike. First session where
+  literally zero of the chosen crops needed rejection or a second look, on a source with no
+  single dominant figure style (JSON-transcript panels, a grouped bar chart, line plots with
+  confidence bands).
+- **The arXiv-ID-scoping fix from session 9 held.** `source_url` came back correctly as
+  `arxiv.org/abs/2608.09867` even though the paper's own text cites dozens of other
+  `arXiv:NNNN.NNNNN`-shaped strings in its 17 pages of references — no repeat of the
+  footnote-false-positive this fix was written for.
+- **Reading every appendix in full, not skimming past "Appendix" headers, paid off directly.**
+  Appendix B — testing whether Kimi-K3 and GLM-5.2 show behavioral evidence of having been
+  distilled from decoded Claude/GPT-5.6 reasoning — turned out to be one of the two most
+  substantial findings on the page, and it is invisible from the abstract, the intro, and the
+  table of contents alike (it's flagged only once, in a single sentence in §3.1). A
+  depth-decision or section-skeleton made from the front matter alone would have missed it
+  entirely.
+
+**What broke:**
+
+1. **Author detection returned one name out of eight**, the same failure class sessions 2, 3
+   and 9 already recorded — a stacked byline with affiliation superscripts, `guess_authors()`
+   returns the first line it parses and stops. `pdf_metadata.author` held the correct
+   semicolon-delimited full list this time, so the fix was a direct substitution rather than a
+   hand transcription. **Logged in TASKS.md as a new failure mode, one field over**: `meta.doi`
+   picked up `10.18653/v1/2025.emnlp-main.1347`, which belongs to a paper cited in this
+   source's own bibliography, not the source itself (an arXiv preprint has no DOI at all). The
+   session-9 fix scoped `find_arxiv_id()` to the front-matter slice; this false match sat in
+   the References section, which a front-matter scope wouldn't catch either — a different
+   constraint is needed for this field.
+2. **No figure candidate for two caption-worthy items** — Table 1 (a cross-model compatibility
+   grid) and Figure 2 (an injection-timing schematic), both on pages 4–5, sitting between
+   figures that all extracted cleanly. Not investigated; described in prose instead. Logged.
+
+**Non-extraction findings:**
+
+- **The `hook` field silently breaks if it contains HTML entities, and it is the one prose
+  field where that matters.** Every other content-JSON prose field (`tldr`, section `html`)
+  passes through `as_paragraphs()`, which leaves a string starting with `<` untouched — so
+  `&rsquo;`/`&mdash;` entities render fine there. `hook` has two different consumers instead:
+  it's spliced raw into the JS-literal resource array that backs `index.html`'s cards, *and*
+  separately run through Python's `html.escape()` for `<meta name="description">`. Writing it
+  with the same entity style as every other field broke both at once — the index card showed
+  literal `&rsquo;` text instead of a curly apostrophe, and the meta tag double-escaped the
+  leading `&` into `&amp;rsquo;`. Caught by reading the built `index.html` line by line, not by
+  any assertion; `verify_page.py`'s existing checks don't look at the card array's raw content.
+  Logged in TASKS.md — the schema docstring should say `hook` is plain-text-only.
+- **The same benchmark-inclusive-vs-genuine-user-only numbers tripped the same session twice,
+  independently, in the two sections written under the least scrutiny.** The source reports
+  privacy-artifact counts under two different denominators: 912 distinct artifacts across
+  *all* decoded traces including synthetic benchmark personas (the paper's own headline
+  "367 PII / 182 credentials" figure), versus 704 from *genuine, non-benchmark* user sessions
+  only (a completely different table). I built the genuine-user table correctly, matching the
+  source's own breakdown row for row — and then, several paragraphs later in the Limitations
+  section, wrote "367 PII artifacts and 182 credentials recovered from **real users' sessions**",
+  mislabeling the all-sources number as the narrower one. Separately, the page's hook claimed
+  the attack "recovers... passport numbers" — the only passport anywhere in the source belongs
+  to an explicitly-labeled *synthetic* ClawBench persona, not a real person. Two independent
+  instances of the same conflation, in the hook and the limitations paragraph — the two
+  passages typically drafted fastest, after the careful cross-checking already happened on the
+  main body. Getting a trap right once, in one paragraph, does not immunize a different
+  paragraph written from a different pass through the same numbers.
+- **A single combined Opus-5 review pass, run once per source page rather than the usual
+  two-blind-agent protocol, caught eleven fidelity issues and six craft issues that survived my
+  own read-through** — including the denominator conflation above, a reversed relationship
+  (Table 1's Fable-5 exception is about which model's reasoning *can't be replayed elsewhere*,
+  not which model can't receive replays — I had it backwards), two adjacent source figures
+  whose captions got cross-attributed (Figure 41's "hedge" framing described but applied to
+  Figure 42's actual mechanism), an equation encoding bug (superscript-n mixed with
+  subscript-plus-one, `τⁿ₊₁` instead of `τₙ₊₁` — invisible in the JSON, only visible by reading
+  rendered `textContent`), and a couple of quiet overgeneralizations (a scoped "these results
+  do not support memorization" softened into an unscoped "ruling out memorization"; a per-model
+  qualifier dropped so a claim read as covering more models than it did). Every finding cited
+  an exact source page and quote, which made adjudication fast — nothing had to be independently
+  re-derived, only checked. Consistent with session 9's finding that one well-briefed
+  same-session pass, with the source still in the working tree, catches real errors without
+  needing the second independent agent — this is the second data point for that, on a
+  differently-shaped (appendix-heavy, security rather than capability) source.
+- **Reproducing the equation's exact subscripts by hand was the review's most invisible catch.**
+  `&#8319;` (superscript n, used for τⁿ) versus `&#8345;` (subscript n, used for τₙ) differ by
+  one Unicode code point and look identical in a code review of the Python source — the bug
+  only exists in the *rendered* character. Confirmed only by reading `document.querySelector('.eq__math').textContent`
+  in the browser, the same DOM-computed-property fallback session 9 used when the screenshot
+  tool wasn't available. Worth restating: a JSON or source-code read cannot catch a
+  Unicode-entity mix-up; only looking at the rendered output can.
+
+**Tooling notes for this environment:**
+
+- **The Browser pane's screenshot tool was unavailable again this session**, same as session 9
+  ("the Browser pane is not displayed, so the page is not compositing frames"). Every
+  verification check this session — image load, overflow, TOC anchor resolution, theme-toggle
+  persistence, search and tag-filter narrowing, and the equation-rendering bug above — was done
+  through `javascript_tool` computed-DOM queries instead. Two sessions running now where this
+  fallback path was not just adequate but caught something a visual scan might have missed
+  (the equation) — worth treating as the default verification method here, not a workaround.
+- **`preview_start` needs a `.claude/launch.json` entry to serve a bare static site**; absent
+  one, a plain `python -m http.server 8000` in the background plus `preview_start` with an
+  explicit `http://localhost:8000/...` URL works identically and needs no config file. Simpler
+  than adding a launch config for a one-off verification pass.
+- **The tag chip's visible text is the tag name concatenated with its count badge with no
+  separator** (`"security1"`, not `"security"`), so a DOM query matching on exact `textContent`
+  fails silently. Match on the `data-tag` attribute instead — `.chip[data-tag="security"]` —
+  which is what the site's own filtering JS keys off.
+
+## Session 12 — reviewing the stealing-reasoning-traces page (no new ingest)
+
+**Source:** the session 11 page itself, 9 sections and ~5,570 words, re-checked against
+`2608.09867v1.pdf`. `inbox/` was still intact, so — as in session 8 — the content JSON, the
+figures JSON and the 3.8 MB PDF were all present, and a rebuild-and-diff proved the JSON
+byte-exact before anything was touched. Two adversaries briefed independently and run on
+Opus 5, then every finding adjudicated against the source myself. The review was cut short by
+the user partway through; both agents were asked to report what they had already
+substantiated and to state their coverage gaps explicitly, which is recorded below.
+
+**The headline: this page had already had a same-session Opus 5 pass, and an independent
+second read still found seven fidelity defects and eleven craft ones.** Session 9 and session 11 both concluded that one well-briefed same-session pass "appears to be enough". Two data
+points said that; this is the third, and it says the opposite. Every finding below survived a
+same-session review that was reading the same source with the same care.
+
+**What the review found:**
+
+1. **The page described the wrong experiment and drew a conclusion the source contradicts.**
+   §04 said an Inkling control ruled out "the possibility that any four-word prefix from any
+   source has this effect". Two errors in one clause. The Inkling control is a **1% prefill**
+   (p. 23, Table 3's lower block; Figure 9's own legend reads "1% of reasoning prefilled"), not
+   a four-word one — the page had correctly noted two prefill regimes exist one paragraph
+   earlier and then attached the control to the wrong one. And the actual four-word study's
+   cross-model control is Kimi-K2.5, which *does* move Kimi-K3 toward Opus (p. 44: "A reduced
+   Opus echo also appears under the Kimi-K2.5 prefill: Kimi-K3 reaches 0.96 against the Opus
+   reference, from 0.99"). **A page that correctly distinguishes two similar experimental
+   conditions in one paragraph can still merge them in the next**, and the merged version reads
+   more conclusive than either.
+2. **The Figure 41/42 cross-attribution came back, reversed.** Session 11 records catching
+   exactly this — "Figure 41's 'hedge' framing described but applied to Figure 42's actual
+   mechanism" — and the fix was applied in the wrong direction. The page ended up describing
+   Figure 41's hedge mechanism and labelling it "the ninth, subtler case", which p. 58 states
+   is Figure 42 ("the difference hinges on a single phrase: 'Let me verify by computing'
+   becomes 'Let me set up coordinates'"). Figure 41 is introduced as "**In another example**"
+   — a separate case, and one of the eight that *did* disclose. **A fix applied to a
+   cross-attribution can restate the same error with the labels swapped**; re-read the source
+   sentence that assigns the label, not just the two candidates.
+3. **A word the source explicitly walks back.** §06 said key rotation "permanently breaks the
+   ability to resume old, legitimate conversations". A.3 does state that cost, but A.4 — same
+   appendix, same page — exists to undo it: a bounded dual-format window plus an opt-in,
+   identity-verified re-signing endpoint. The page stopped reading one subsection early.
+4. **Two exhaustive framings that a table contradicts.** "none of the paper's **other** tested
+   open models" and "**the** other tested open models — DeepSeek's checkpoints and Inkling"
+   imply four models were tested; p. 43 says six (Kimi-K3, Kimi-K2.6, Kimi-K2.5, GLM-5.2,
+   DeepSeek-V3.1, Inkling). Worth recording that the *narrow* claim survived: only Kimi-K3 and
+   GLM-5.2 moved toward the proprietary reference (p. 44, "exactly three reference cells fall
+   below their unprefilled baselines"), and the paper's own B.1 summary frames it exactly as
+   the page did. **The defect was the quantifier, not the fact** — and the fidelity agent
+   correctly narrowed its own finding to that, rather than asking for the headline to change.
+5. **A caveat imported into a table that does not contain it.** §02 attributed the "3.1 Flash
+   Lite does not decode the older 2.5 series" exception to Table 1. It comes from §2.4 (p. 5),
+   and Table 1's caption states the Gemini result unhedged — "the thinking traces of any model
+   can be replayed into any other" — because the 2.5 series is not in Table 1 at all. The
+   page's "most Gemini model pairs tested" hedged a claim the source makes universally.
+6. **Four of six figure crops carried a sliced strip of the source's own caption**, glyphs cut
+   through their x-height, sitting directly above the page's own `<figcaption>`. Invisible in
+   the figures JSON, invisible in every automated check, and invisible to a reviewer reading
+   the page — it only showed on opening the images at full size. Logged in TASKS.md with a
+   measured fix. **Sessions 1–3 learned "open every crop before shipping it" about *bad* crops;
+   this is the same lesson about crops that are 99% correct.**
+7. **The undefined-basics failure, five for five.** `token` — 11 uses, the unit the page's
+   entire faithfulness argument is denominated in ("the number of tokens recovered by decoding
+   tracks the provider's own billed thinking-token count"), plus the $720 cost, the 50-token
+   cutoff and the 16-token span — was never defined and not in the glossary. So were
+   `open-weight` (8 uses, and the **first technical term on the index card**), `PII` (never
+   expanded, with a headline number on it), `nonce`, `ciphertext`, `base64`, `prefill` (the
+   mechanism of all of §04), `trajectory` and `benchmark rollout` (the units the 6,708/704/912
+   counts attach to). The glossary's ten entries looked complete while defining `style
+   classifier` and `perplexity`. Sessions 4 and 8 recorded this for `token`/`chain-of-thought`
+   and `AGI`/`superintelligence`; **it has now happened on every paper page in the library.**
+   Worth treating as a required build step rather than a review finding.
+8. **The one table clipped its last column at desktop width and was not marked `wide`.**
+   `scrollWidth 610 > clientWidth 578` at 1280px, truncating the header mid-word; the clipped
+   column carried the page's sharpest number. The writing guide's own rule covers it ("or the
+   last column ends up clipped inside the scroll box") and `verify_page.py` passes either way,
+   because it asserts the container fits and scrolls — which a clipped table also does.
+
+**What held up.** Everything numeric, again. All sixteen privacy-table cells against Table 4;
+the 704-vs-912 denominator split in all five places it appears (the exact trap session 11 was burned by twice — the fix held); 0.3%/4.9%/315,320/6,708; the MATH500 and $720 figures; 29 of
+30; both AUC drops; the hash-chain equation character-for-character including `τₙ₊₁` and both
+salt subscripts; all fourteen quotations; every model attribution across nineteen model names;
+the eight-author byline; both external bibliography entries down to given names. Table 1's
+Fable 5 and GPT-5.6 directions — reversed in an earlier draft — are now correct, verified
+cell-by-cell rather than from the caption.
+
+**A held finding of mine that was wrong.** I flagged the disclosure callout's "the providers
+had already shipped mitigations" as an inference the source doesn't make, because §5.2 (p. 10)
+only says "we were unable to launch the same attacks". The fidelity agent found the
+Reproducibility Statement on **p. 14**: "no longer reproducible … **because of mitigations
+implemented by providers following our disclosure**." Third review running where checking the
+primary occurrence stopped a false finding — and the first where the adversary saved *me*
+rather than the reverse.
+
+**On running adversaries, and on stopping them early.** Both over-reported as designed, and
+the rejections are the useful part: **em-dash density** (91 across 5,587 words) was measured
+and rejected for the third time, on the standing reasoning that no threshold makes a density a
+defect and rewriting correct prose risks introducing errors — this is now settled precedent,
+not a fresh judgement each time. **`--ink-faint` failing AA at 4.08:1** was measured accurately
+and rejected *for this page*: it is a site-wide token already logged in TASKS, and fixing it
+here would fix it nowhere. The **missing "Why it matters" section** was rejected — the guide
+says adapt the skeleton. When the agents were stopped mid-run, asking them to report only what
+they had already substantiated **and to state their coverage gaps explicitly** kept the report
+honest: the craft agent named seven unexamined areas, which is what stopped this session from
+recording a clean bill of health it had not earned.
+
+**Tooling notes for this environment:**
+
+- **The `sub()` helper in the review skill needs its window widened for figure blocks.** A
+  height-attribute regex bounded at 600 characters silently matched zero times because this
+  page's `alt` texts run to ~700. The assert-once discipline caught it — the script exited
+  before writing anything — which is exactly the failure the helper exists to make loud.
+- **`verify_page.py` passes a clipped table.** It asserts the scroll container fits and that
+  `scrollWidth > clientWidth`, which is correct for a *wide* table and equally true of a table
+  that is merely too narrow for its content. Distinguishing them needs a comparison against the
+  reading measure, not against the container.
+- **The Browser pane's screenshot tool was available this session**, unlike sessions 9 and 11.
+  Reading the four figure images directly is what caught the sliced caption strips; no
+  computed-DOM query would have.
+- **Cropping with Pillow re-encodes.** Removing 2–3 px from four WebP figures grew them 15–20%
+  (e.g. 101,980 → 120,712 bytes) at quality 92. Acceptable here, but a lossless re-crop from
+  the PDF region would be better if this becomes a routine fix.
+
+---
 
 ## Session template
 

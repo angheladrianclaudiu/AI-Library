@@ -91,6 +91,44 @@ source that caused it.
       `sys.stdout.reconfigure(encoding="utf-8", errors="replace")` before anything is printed.
       Regression-tested: the same PDF now extracts cleanly with no `PYTHONIOENCODING` env var
       set.
+- [ ] **`meta.doi` can pick up a DOI from the bibliography, not the paper.** Session 11's
+      source has no DOI of its own — it's an arXiv preprint — but the extracted metadata
+      confidently reported `10.18653/v1/2025.emnlp-main.1347`, which belongs to a paper cited
+      *in the source's own reference list* (Green et al., "Leaky thoughts", EMNLP 2025). Same
+      species of bug as `find_arxiv_id()`'s footnote false-positive (fixed session 9, above),
+      one field over and one step further: that fix scoped the arXiv-ID search to the front
+      matter; the DOI regex apparently has no positional constraint at all and this time the
+      false match sat in the References section rather than a mid-document footnote, so a
+      front-matter-only scope wouldn't have caught it either. Never surfaced in the built page
+      because DOI isn't a schema field the skill uses, only spotted by reading `meta.doi` in
+      passing — but a future resource that *does* have a real DOI and also cites DOI-bearing
+      papers would get this wrong silently. Fix: either drop `meta.doi` from the heuristic
+      output entirely (arXiv preprints don't have one, and the skill has never needed it), or
+      require it to appear before a detected `References`/`Bibliography` heading.
+- [ ] **No figure candidate for a checkmark-grid table.** Session 11's source has two
+      caption-worthy items the extractor produced zero candidates for: Table 1 (a
+      cross-model-compatibility grid, mostly checkmarks) on page 4, and Figure 2 (a schematic
+      of injection timing) on page 5. Neither the embedded-image pass nor the region-render
+      pass emitted anything for either, on a source where every other figure on adjacent pages
+      cropped cleanly with zero intervention — so this isn't the usual margin-caption or
+      icon-flood failure mode, something about these two specific items didn't trigger caption
+      detection at all. Not investigated this session (both were describable in prose without
+      the image), but worth a look next time a source leans on a large checkmark/grid table.
+- [ ] **A region crop can include the top 2–3 pixel rows of the source's own caption.** Four
+      of session 11's six kept figures (`fig-p02-figure-1`, `fig-p08-figure-6`,
+      `fig-p24-figure-9`, `fig-p58-figure-40`) ended with a sliced strip of the source caption
+      line — the glyphs cut horizontally through their x-height, rendering as a smudged row of
+      half-letters directly above the page's own `<figcaption>`. Session 12 measured it: the
+      artwork ends 15–28 pt above, then the crop runs *past* the whitespace gap and stops
+      2–3 px into the caption. This is the inverse of session 2's `TEXT_REACH` problem — not
+      the crop stopping too early, but the bottom bound landing just inside the next text
+      block. Every existing check passed: the crops looked correct in the figures JSON, in a
+      thumbnail, and to two reviewers reading the page; only opening the images at full size
+      showed it. Fix: after computing a region's bottom bound, walk back up through any
+      trailing run of ink that is (a) shorter than ~5% of the crop height and (b) separated
+      from the artwork by a clear whitespace gap, and cut at the gap instead. Worth pairing
+      with the open "automate the crop sanity check" item above — a cheap assertion that the
+      final row of a crop is background would have caught all four.
 
 ## Article branch
 
@@ -255,6 +293,18 @@ source that caused it.
       8 fixed the script instead. `executable_path` is now only passed when the
       `AI_LIBRARY_CHROMIUM` env var is set, so Playwright resolves its own bundled browser by
       default and the pinned-path case the constant was written for still works.
+- [ ] **`hook` silently breaks if it contains HTML entities, and nothing says so.** The
+      content JSON schema comment in `make_page.py` gives no guidance on `hook`'s format, and
+      it's the one prose field with two incompatible consumers: it's embedded raw into the
+      JS-literal array that backs `index.html`'s cards, and separately passed through
+      `html.escape()` for `<meta name="description">`. Session 11 wrote it with `&rsquo;` and
+      `&mdash;` entities (correct for every other prose field, which all pass through
+      `as_paragraphs()` and get left alone because they start with `<`) and broke both
+      consumers at once: the index card rendered the literal entity text instead of the
+      punctuation, and the meta tag double-escaped the leading `&` into `&amp;rsquo;`. Caught
+      by reading the built `index.html`, not by any check — `make_page.py` has no assertion
+      that would have flagged it. Fix: state in the schema docstring that `hook` must be plain
+      Unicode text with no markup, unlike every other field.
 - [ ] **The depth rubric has no row for a multi-part source.** `SKILL.md` tops out at
       "20–30 min (~5,000–8,000 words)" for "a dense methods paper, or a long-form essay".
       Session 7's source is *five* essays totalling ~52,000 words across 165 pages; covering
