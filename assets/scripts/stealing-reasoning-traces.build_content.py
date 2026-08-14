@@ -21,7 +21,7 @@ hook = (
     "by any weaker, less-guarded model from the same provider. The authors used the gap to "
     "pull 315,320 hidden reasoning traces out of publicly shared agent logs, recover live API "
     "keys and other credentials, and find early behavioral evidence that a couple of open-weight "
-    "models may already answer suspiciously like Claude and GPT-5.6 mid-thought."
+    "models may already answer unusually like Claude and GPT-5.6 mid-thought."
 )
 
 tldr = [
@@ -64,10 +64,7 @@ secrets, or a harmful line of reasoning the model was careful to keep out of its
 response. By the time of this paper, the major providers &mdash; Anthropic, OpenAI and Google &mdash; had
 all stopped returning this reasoning in plain text.</p>
 
-<p>What they return instead is an opaque block: a base64-encoded signature or ciphertext that
-functions as an Authenticated Encryption with Associated Data (AEAD) envelope &mdash; a header
-naming the model and format version, a nonce, an authentication tag (a MAC, short for message
-authentication code), and the encrypted reasoning itself. Critically, providers don&rsquo;t keep a copy of this reasoning on their own
+<p>What they return instead is an opaque block, written as a long run of text-safe characters (base64) so it survives being passed around as ordinary text. It works as an Authenticated Encryption with Associated Data (AEAD) envelope: a header naming the model and format version, a nonce (a number used once, so the same reasoning never encrypts to the same block twice), an authentication tag (a MAC, short for message authentication code), and the ciphertext &mdash; the encrypted reasoning itself. Critically, providers don&rsquo;t keep a copy of this reasoning on their own
 servers. To avoid that storage cost, the client is required to hold the encrypted block and
 send it back with every subsequent turn of a multi-turn conversation, the same way a session
 cookie works. The provider can then verify the block&rsquo;s authenticity and, if needed,
@@ -129,7 +126,7 @@ complies, and the plaintext comes back out.</p>
        same factorization Opus performed. Below, three scatter plots for Anthropic, OpenAI and
        Google models plot decoded reasoning length against the provider's own reported
        thinking-token count, with points clustering tightly along the diagonal."
-       width="1294" height="945">
+       width="1294" height="942">
   <figcaption>
     <span class="figlabel">Figure 1</span>The mechanism. Opus 4.8 is asked to factor a number
     and returns an encrypted thinking block (left) alongside a normal answer. That same
@@ -156,21 +153,20 @@ prompt-injection attacks work.</p>
 difference in how hard each one was to coerce. For Claude, Haiku 4.5 &mdash; the weakest
 available model, and one that accepts a prefilled start to its own visible answer &mdash;
 worked with a single, reusable transcription prompt for every attack shown in Figure 1,
-&ldquo;surprisingly robust&rdquo; even at generation temperature 1 (an optional second pass,
+&ldquo;surprisingly robust&rdquo; even at generation temperature 1 (the dial controlling how much randomness the model uses when choosing each next token &mdash; 1 is the ordinary default, not a tidy, deterministic setting) (an optional second pass,
 reconciling several noisy decodings with a different prompt, sharpens the result further).
 For GPT, no single prompt
 was reliable: the authors needed the least-capable member of the GPT-5.6 line that could still
 process every earlier model&rsquo;s traces, best-of-n sampling over multiple candidate
 transcriptions, and &mdash; because the API began rejecting completions once they reproduced
-more than roughly 50 consecutive tokens of the original reasoning &mdash; splitting the
+more than roughly 50 consecutive tokens of the original reasoning &mdash; tokens being the sub-word pieces a model reads and writes, and the unit these APIs bill in &mdash; splitting the
 extraction into short chunks and stitching them back together turn by turn. Gemini extraction,
 using Gemini Robotics 1.6 as the decoder, sat in between: noisier than Claude, handled by
 sampling many candidate decodings and reconciling the best ones into a single transcript with
 a second model. Table 1 in the paper maps this out concretely as of July 2026: every Claude
 model&rsquo;s reasoning can be replayed into every other &mdash; except Fable 5&rsquo;s own
 reasoning, which stays put &mdash; GPT-5.6 models can replay every earlier GPT
-generation&rsquo;s traces, and Gemini traces move freely between most Gemini model pairs
-tested, with one named exception (3.1 Flash Lite does not decode the older 2.5 series).</p>
+generation&rsquo;s traces, and Gemini traces move freely between every Gemini pair the table covers. The paper&rsquo;s method section adds one exception from outside that grid: 3.1 Flash Lite does not decode the older 2.5 series.</p>
 
 <p>To check the decoded text was genuinely faithful to the model&rsquo;s real reasoning
 &mdash; rather than a plausible-sounding hallucination &mdash; the authors compare the number
@@ -212,7 +208,7 @@ the discarded reasoning block instead of the answer.</p>
 <figure>
   <img src="../assets/images/stealing-reasoning-traces/fig-p07-figure-4.webp"
        alt="A prompt asking about cars that are notoriously easy to steal. The decoded reasoning
-       names specific vulnerable Kia and Hyundai models from 2011-2021, explains that they
+       names Kia and Hyundai vehicles from roughly 2011-2021 as notoriously vulnerable, explains that they
        lacked engine immobilizers, and describes stealing them by breaking the steering column
        and starting the car with a USB cable, plus relay attacks and CAN bus injection. The
        model's visible answer only lists high-level recommendations for automakers."
@@ -221,8 +217,7 @@ the discarded reasoning block instead of the answer.</p>
     <span class="figlabel">Figure 4</span>Asked (via a prompt paraphrased from HarmBench, a
     standard AI red-teaming benchmark) to reason about theft-prone cars before answering only
     with hardening advice, Opus 4.8&rsquo;s
-    visible answer stays generic and benign. Its decoded reasoning names the exact vulnerable
-    models, the immobilizer gap that made them exploitable, and the concrete technique &mdash;
+    visible answer stays generic and benign. Its decoded reasoning names the vulnerable makes and model years, the immobilizer gap that made them exploitable, and the concrete technique &mdash;
     content the safety training kept out of the answer but never touched in the reasoning.
     <span class="figsrc">Extracted from page 7 of the source PDF.</span>
   </figcaption>
@@ -233,21 +228,19 @@ the discarded reasoning block instead of the answer.</p>
 <p>The third-party version of the attack doesn&rsquo;t require querying any target model at
 all. Developers routinely publish raw agent session logs &mdash; for reproducibility, for
 sharing a cool result &mdash; without realizing the encrypted reasoning blocks embedded in them
-can be decoded by anyone who has a compatible sibling model. The authors collected 6,708
-publicly available agent trajectories from GitHub and Hugging Face that still carried
-signed reasoning blocks, and decoded all 315,320 of them.</p>
+can be decoded by anyone who has a compatible sibling model. The authors collected 6,708 publicly available agent trajectories &mdash; complete recordings of an agent working a task from start to finish &mdash; from GitHub and Hugging Face that still carried signed reasoning blocks, and decoded all 315,320 of them.</p>
 
 <p>An automated two-stage pipeline &mdash; a high-recall first-pass labeler that flags anything
 that might be sensitive, followed by a stricter second-pass classifier that filters out
 placeholders and fixtures &mdash; found at least one genuine privacy violation in 0.3% of
 individual reasoning blocks, but in 4.9% of the 6,708 sessions overall. Restricted to
-non-benchmark sessions from real users (excluding synthetic personas from benchmark rollouts),
+non-benchmark sessions from real users (excluding the synthetic personas that appear in benchmark rollouts, the runs recorded when a model is scored against a benchmark&rsquo;s scripted tasks rather than helping a real user),
 decoding recovered 704 distinct sensitive artifacts, including the items below. Sixty-four of
 these &mdash; 9% &mdash; appeared <em>only</em> inside the encrypted reasoning and nowhere in
 the session&rsquo;s visible, readable text, meaning a user who had carefully scrubbed their
 plaintext before publishing it would still have been exposed.</p>
 
-<div class="table-scroll"><table class="numeric">
+<div class="table-scroll wide"><table class="numeric">
 <thead><tr><th>Category</th><th>Distinct values, genuine sessions</th><th>Reasoning-only (invisible in plaintext)</th></tr></thead>
 <tbody>
 <tr><td>Name</td><td>130</td><td>4</td></tr>
@@ -266,8 +259,7 @@ anonymize a session before sharing it. To do that, the model re-reads the full h
 its hidden reasoning &mdash; restating exactly the sensitive values it&rsquo;s about to remove
 &mdash; and that restatement gets encrypted and shipped right along with the &ldquo;cleaned&rdquo;
 transcript. Figure 5 shows two real examples pulled from the wider, all-sources count (which
-also includes benchmark rollouts using synthetic identities, and totals 912 artifacts across
-PII, credentials and technical identifiers, summarized in Figure 6): a GPT-5.2 Codex trace
+also includes benchmark rollouts using synthetic identities, and totals 912 artifacts across personally identifiable information (PII), credentials and technical identifiers, summarized in Figure 6): a GPT-5.2 Codex trace
 recalling the exact AWS and Hugging Face tokens it had been asked to redact from a repository
 before publishing, and a Claude Sonnet 4.6 trace reasoning over a synthetic
 travel-booking persona&rsquo;s full name, email, passport number and credit card details.</p>
@@ -281,9 +273,7 @@ travel-booking persona&rsquo;s full name, email, passport number and credit card
        width="1294" height="512">
   <figcaption>
     <span class="figlabel">Figure 5</span>Two of the paper&rsquo;s examples of what decoding
-    recovers from published session logs. Left: an agent restating live credentials while
-    trying to remove them. Right: an agent reasoning over a full synthetic identity&rsquo;s
-    personal data mid-task &mdash; the kind of content that never has to reach the visible
+    recovers from published session logs. Left: GPT-5.2 Codex restating live credentials while trying to remove them. Right: Claude Sonnet 4.6 reasoning over a full synthetic identity&rsquo;s personal data mid-task &mdash; the kind of content that never has to reach the visible
     answer to end up permanently attached to a public transcript.
     <span class="figsrc">Extracted from page 8 of the source PDF.</span>
   </figcaption>
@@ -294,7 +284,7 @@ travel-booking persona&rsquo;s full name, email, passport number and credit card
        alt="Bar chart showing 367 distinct PII items, 363 distinct technical identifiers, and
        182 distinct credentials recovered across all 315,320 decoded reasoning blocks,
        including benchmark sources."
-       width="564" height="374">
+       width="564" height="372">
   <figcaption>
     <span class="figlabel">Figure 6</span>The headline breakdown across all 315,320 decoded
     blocks, including benchmark rollouts with synthetic identities &mdash; 912 distinct
@@ -330,9 +320,7 @@ scanner to catch, because the plaintext was never where it lived.</p>
 
 # ---------------------------------------------------------------------------
 sec_elephant = """
-<p>Having built a working reasoning decoder, the authors turned it on a different question:
-now that proprietary chains-of-thought can be recovered at scale, do any of today&rsquo;s
-popular open-weight reasoning models already show signs of having been trained on them? This
+<p>Having built a working reasoning decoder, the authors turned it on a different question in a 30-page appendix that the abstract and introduction never mention: now that proprietary chains-of-thought can be recovered at scale, do any of today&rsquo;s popular open-weight reasoning models &mdash; those whose trained parameters anyone can download and fine-tune &mdash; already show signs of having been trained on them? This
 is squarely the distillation concern from the section above, just aimed inward at the
 open-weight ecosystem rather than at a hypothetical attacker.</p>
 
@@ -357,14 +345,10 @@ style classifier trained to tell two sets of traces apart by their writing stati
 overlap between each trace&rsquo;s most distinctive phrases, and how surprised (low or high
 perplexity) each model is by the other&rsquo;s text.</p>
 
-<p>Two models, Kimi-K3 and GLM-5.2, showed a movement none of the paper&rsquo;s other tested
-open models did. Prefilling Kimi-K3 with a handful of Claude-generated reasoning tokens shifted
+<p>Of the six open-weight models tested, two &mdash; Kimi-K3 and GLM-5.2 &mdash; were the only ones whose reasoning moved measurably toward the proprietary reference traces. Prefilling Kimi-K3 with a handful of Claude-generated reasoning tokens shifted
 not just its continued reasoning but the style of its <em>visible answer</em> toward Claude&rsquo;s
 &mdash; on 29 of 30 tested problems, the prefilled completion shared more overlapping phrasing
-with Opus 4.8&rsquo;s actual answer than the model&rsquo;s own unprompted answer did. A control
-experiment prefilling Kimi-K3 with a fragment from a different open model, Inkling, instead of
-from Opus, produced no such shift &mdash; ruling out the possibility that any four-word prefix
-from any source has this effect.</p>
+with Opus 4.8&rsquo;s actual answer than the model&rsquo;s own unprompted answer did. A control experiment prefilling Kimi-K3 with the opening of an Inkling trace instead of an Opus one produced no significant shift, so the pull tracks which model supplied the prefill rather than prefilling as such. The separation is not absolute, though: in the separate four-word experiments a prefill taken from Kimi-K2.5 also nudged Kimi-K3 toward the Opus reference, if less far than an Opus prefill did.</p>
 
 <figure>
   <img src="../assets/images/stealing-reasoning-traces/fig-p24-figure-9.webp"
@@ -372,7 +356,7 @@ from any source has this effect.</p>
        Opus 4.8's answer against number of sampled completions. Kimi-K3's prefilled condition
        (solid lines) sits well above its unprefilled condition (dashed lines) for both STEM and
        non-STEM problems. Inkling's prefilled and unprefilled lines overlap almost completely."
-       width="1299" height="548">
+       width="1299" height="545">
   <figcaption>
     <span class="figlabel">Figure 9</span>Prefilling just the opening fragment of a decoded
     Opus 4.8 reasoning trace measurably pulls Kimi-K3&rsquo;s own free-form visible answer
@@ -395,9 +379,7 @@ closest to its own style were, in the authors&rsquo; words, &ldquo;four consecut
 model releases&rdquo; &mdash; though they immediately caution that perplexity is &ldquo;a
 coarse metric&rdquo; whose results &ldquo;should not be interpreted as a confirmatory measure
 of model similarity,&rdquo; especially since most of the models tested actually found other
-models&rsquo; reasoning more probable than their own. Under the same interventions, the other
-tested open models &mdash; DeepSeek&rsquo;s checkpoints and Inkling &mdash; showed no
-comparable pull toward the proprietary references on any of these measures, even where a
+models&rsquo; reasoning more probable than their own. Under the same interventions, DeepSeek&rsquo;s checkpoints and Inkling showed no comparable pull toward the proprietary references on any of these measures, even where a
 prefill did measurably change their own style (Inkling&rsquo;s classifier score shifts under
 an Opus prefill, just not toward the Opus reference itself). And reproducing the reasoning
 channel itself, verbatim, stayed far out of reach for every model tested: even Kimi-K3, the
@@ -414,8 +396,7 @@ trained.</p>
 
 # ---------------------------------------------------------------------------
 sec_reveals = """
-<p>Once reasoning can be decoded at scale, what comes back out is itself a data source the
-paper wasn&rsquo;t originally built to study &mdash; the authors describe several phenomena
+<p>Once reasoning can be decoded at scale, what comes back out is itself a data source the paper wasn&rsquo;t originally built to study &mdash; gathered, like the previous section, in its appendices rather than its main body &mdash; the authors describe several phenomena
 they say are, to their knowledge, the first fully independent report of these behaviors
 outside a controlled evaluation setting.</p>
 
@@ -443,7 +424,7 @@ that summary against the thing it&rsquo;s meant to represent.</p>
        tokens, for six Claude models on Codeforces problems. Nearly all points fall far below
        the diagonal y=x line, meaning the summary is consistently much shorter than the actual
        hidden reasoning across the full range of reasoning lengths shown."
-       width="1294" height="434">
+       width="1294" height="432">
   <figcaption>
     <span class="figlabel">Figure 40</span>The summary Claude&rsquo;s API shows a user is a
     small fraction of the actual hidden reasoning &mdash; decoding the signature recovers
@@ -457,9 +438,7 @@ that summary against the thing it&rsquo;s meant to represent.</p>
 missing on the way. Checking 18 decoded Opus 4.8 traces against their own displayed summaries
 on AIME 2025 problems (a US high-school competition-math exam), the authors found 9 where the
 model&rsquo;s private reasoning states the final answer before it has actually derived it
-&mdash; evidently recalling a memorized value and working backward to justify it. In 8 of those
-9 cases the summary discloses this too; it is the ninth, subtler case that shows what
-compression can cost. There the decoded reasoning opens with an uncertain memory probe
+&mdash; evidently recalling a memorized value and working backward to justify it. In 8 of those 9 cases the summary discloses this too. In the ninth, the summary drops a single phrase &mdash; the reasoning&rsquo;s &ldquo;Let me verify by computing&rdquo; becomes &ldquo;Let me set up coordinates&rdquo; &mdash; removing the one cue that the computation was checking an answer the model already held. A separate example shows more sharply what compression can cost: there the decoded reasoning opens with an uncertain memory probe
 &mdash; &ldquo;known answer &hellip; ? Let me recall&rdquo; &mdash; before abandoning it for a
 fresh computation, and the summary keeps the computation but restates the abandoned guess as a
 plain fact, silently dropping the question mark that had marked it unconfirmed. A separate
@@ -527,12 +506,7 @@ its own session and immediate predecessor:</p>
 
 <div class="eq">
   <div class="eq__math">&tau;&#8345;&#8330;&#8321; = H( user_id &#8741; session_id &#8741; H(&tau;&#8345; &#8741; salt&#8322;) &#8741; salt&#8321; )</div>
-  <div class="eq__read"><strong>In words</strong>To authenticate reasoning block n+1, hash
-  together the requesting user&rsquo;s identity, the session identifier, and a hash of the
-  previous block&rsquo;s content &mdash; then fold that combined hash into the new block&rsquo;s
-  encryption as associated data. A block replayed into a different user, a different session,
-  or out of its original order in the conversation now fails this check and gets rejected,
-  without the provider ever needing to store the reasoning itself.</div>
+  <div class="eq__read"><strong>In words</strong>H is a hash function, &#8741; means &ldquo;joined end to end&rdquo;, and the two salts are fixed random values stirred in so an attacker cannot precompute the answers. To authenticate reasoning block n+1, join the requesting user&rsquo;s identity, the session identifier and a salted hash of the previous block&rsquo;s content, hash the result, and fold that into the new block&rsquo;s encryption as associated data. A block replayed into a different user, a different session, or out of its original order now fails this check, without the provider ever needing to store the reasoning itself. The authors are careful about how far this goes: it raises the cost of an attack rather than ending it, since an adversary who replays a whole conversation in its original order can still coerce a decoder.</div>
 </div>
 
 <p>Chaining introduces a real cost: legitimate workflows need to fork a conversation, compact
@@ -545,9 +519,7 @@ spans a provider chooses to keep intact.</p>
 
 <p>Two things this can&rsquo;t fix. First, anything already published: the 6,708 sessions the
 authors scraped were signed under a key that never encoded user or session context in the first
-place, so the only retroactive remedy is a blanket rotation of every pre-fix signing key,
-which permanently breaks the ability to resume old, legitimate conversations along with closing
-the attack. Second, even a cryptographically perfect envelope only constrains <em>which</em>
+place, so the only retroactive remedy is a blanket rotation of every pre-fix signing key, which closes the attack and invalidates legitimate continuations of old sessions along with it. The authors soften that with a bounded window in which both old and new envelopes are honoured, plus an opt-in re-signing endpoint for archived transcripts whose owner can be verified. Second, even a cryptographically perfect envelope only constrains <em>which</em>
 model is permitted to decode a block &mdash; it can&rsquo;t constrain what a model does once it
 is legitimately asked to process its own genuine prior reasoning. As long as some compliant
 model in the ecosystem will decode on request, encrypted reasoning can never be more than
@@ -600,14 +572,18 @@ retaining the underlying dataset.</p>
 
 glossary = """
 <dl class="glossary">
+<dt>Token</dt><dd>The sub-word piece a model reads and writes &mdash; roughly a short word or fragment of one. Reasoning length, API billing and every count in this paper are measured in tokens.</dd>
+<dt>Open-weight model</dt><dd>A model whose trained parameters are published for anyone to download, run and fine-tune, as opposed to one reachable only through its owner&rsquo;s API.</dd>
+<dt>Signature / encrypted reasoning block</dt><dd>The opaque blob a provider returns in place of the plaintext reasoning, and which the client must send back each turn. Named for the field it travels in; it both authenticates the reasoning and carries it.</dd>
+<dt>Prefill</dt><dd>Supplying the opening words of a model&rsquo;s response or reasoning so it continues from them rather than starting fresh &mdash; the intervention behind both the extraction attack and the open-weight experiments.</dd>
+<dt>Hash / salt</dt><dd>A hash is a one-way fingerprint of some data: easy to compute, impractical to reverse. A salt is a fixed random value mixed in first, so identical inputs cannot be recognised by their fingerprints alone.</dd>
 <dt>Chain-of-thought / reasoning trace</dt><dd>The step-by-step internal deliberation a
 reasoning model generates before writing its final, user-visible answer.</dd>
 <dt>Extended thinking / thinking block</dt><dd>A provider&rsquo;s name for the API object
 carrying a model&rsquo;s reasoning for a given turn &mdash; increasingly returned encrypted
 rather than in plain text.</dd>
 <dt>AEAD (Authenticated Encryption with Associated Data)</dt><dd>A cryptographic scheme that
-both encrypts a message and lets the recipient verify it hasn&rsquo;t been tampered with, using
-a header, nonce, ciphertext and authentication tag.</dd>
+both encrypts a message and lets the recipient verify it hasn&rsquo;t been tampered with. The &ldquo;associated data&rdquo; is context bound into the envelope and authenticated but left unencrypted &mdash; which is where this paper&rsquo;s proposed fix puts the user and session identity.</dd>
 <dt>MAC (Message Authentication Code)</dt><dd>A cryptographic checksum, computed with a secret
 key, that lets a verifier confirm a message&rsquo;s integrity and origin without needing to see
 its full history.</dd>
