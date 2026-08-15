@@ -254,9 +254,9 @@ high-complexity functions. Each callable gets a mass:</p>
 </div>
 
 <div class="eq">
-  <div class="eq__math">Erosion  =  Σ mass(f) for all f where CC(f) > 10
-             ─────────────────────────────────
-                    Σ mass(f) for all f</div>
+  <div class="eq__math">Erosion = Σ mass(f) where CC(f) > 10
+          ────────────────────────
+                 Σ mass(f)</div>
   <div class="eq__read"><strong>In words</strong>Add up the mass of every function whose cyclomatic
   complexity exceeds 10, and divide by the total mass of every function in the codebase. The result
   runs from 0 to 1 and answers one question: what fraction of this program's complexity is
@@ -280,11 +280,11 @@ intermediate variables that carry no information. It is measured in two parts �
 detection of duplicated (clone) lines.</p>
 
 <div class="eq">
-  <div class="eq__math">Verbosity  =  | flagged lines ∪ clone lines |
-              ────────────────────────────
-                        LOC</div>
-  <div class="eq__read"><strong>In words</strong>Take every line caught by a wasteful-pattern rule,
-  union it with every line that is a duplicate of another, count the result once — the union matters,
+  <div class="eq__math">Verbosity = | flagged ∪ clone |
+                 ───────────────
+                       LOC</div>
+  <div class="eq__read"><strong>In words</strong>Take every line caught by a wasteful-pattern rule (“flagged”) and every line that is a
+  duplicate of another (“clone”), union the two sets, count the result once — the union matters,
   since a line hit by three rules should count once — and divide by the total lines of code. Also
   bounded between 0 and 1, so runs of different sizes are comparable.</div>
 </div>
@@ -696,14 +696,14 @@ of the benchmark is the durable contribution.</p>
 
   <footer class="colophon">
     <p>Explained and published in the AI Library on 01 August 2026.</p>
-    <p>This page is a plain-English explanation written from the source listed above — read the
-       original for the authors' own words, exact numbers and full method details.</p>
+    <p>This page is a plain-English explanation written from the source listed above — read the original for the authors&#x27; own words, exact numbers and full method details.</p>
     <p><a href="../index.html">← Back to the library</a></p>
   </footer>
 
 </main>
 
 <script src="../assets/app.js"></script>
+
 
 </body>
 </html>
