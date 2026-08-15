@@ -13,8 +13,8 @@
       "security"
     ],
     "hook": "DeepMind's production watermark for LLM text: a knockout tournament among candidate tokens, refereed by a secret key, that leaves a statistical signature detectable without ever touching the model — validated live in Gemini across nearly 20 million responses with no measurable loss in quality.",
-    "read_minutes": 18,
-    "words": 3929,
+    "read_minutes": 20,
+    "words": 4465,
     "page": "pages/synthid-text-watermarking.html",
     "source_url": "https://www.nature.com/articles/s41586-024-08025-4",
     "pdf": null,
