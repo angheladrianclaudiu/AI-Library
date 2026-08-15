@@ -22,6 +22,15 @@ without the source that produced it is not much use to the next session.
   obvious the moment the image was opened.
 - **Metadata heuristics fail quietly.** An empty `authors` field is easy to miss and ends
   up as a page with no byline.
+- **One adversarial review round is never enough — every round run so far has found real
+  defects, on every page tried, including pages a previous round had already fixed.**
+  Sessions 4, 8, 12, 14 and 15 each found genuine, distinct fidelity or craft issues on a
+  page that had already passed at least one review. Session 15 found defects session 14's
+  own fixes had introduced. Treat a clean-looking round as the surprising result requiring
+  double-checking, not the default — and budget for at least two full cycles (brief →
+  adjudicate → fix → re-verify), stopping only when a cycle returns nothing beyond findings
+  already rejected by precedent. `add-resource` step 9 and `review-resource`'s workflow both
+  now require this explicitly rather than leaving it to session judgement.
 
 ---
 

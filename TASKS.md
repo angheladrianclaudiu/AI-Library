@@ -160,14 +160,17 @@ source that caused it.
 
 ## Site and HTML
 
-- [ ] **`verify_page.py` doesn't check `.eq__math` for overflow.** The component is
-      `white-space: pre` with `overflow-x: auto`, so a line too long for the box scrolls
-      silently rather than visibly breaking — invisible in a screenshot, only caught by
-      comparing `clientWidth` to `scrollWidth` in the browser. Session 13 shipped two
-      overflowing equations this way (1685px and 1020px of content in a 672px box) before
-      catching it by hand. `verify_page.py` already has the pattern for exactly this shape
-      of bug (the wide-table scroll-container check); add a loop over `.eq__math` elements
-      asserting `scrollWidth <= clientWidth`, or close to it, at desktop width.
+- [ ] **`verify_page.py`'s new `.eq__math` overflow check found pre-existing bugs on three
+      already-published pages the day it shipped.** `context-engineering-survey.html` has
+      an equation overflowing by up to 762px (desktop) and a second one overflowing on
+      phone; `slopcodebench.html` has two equations overflowing on phone width (439px and
+      413px of content in a 359px box); `stealing-reasoning-traces.html` has one
+      overflowing by 142px on phone. None were caught at ingest because the check didn't
+      exist yet. Needs a `/review-resource` pass on each to recover the content JSON,
+      shorten the offending `.eq__math` lines, and move the excess into `.eq__read` — the
+      same fix already applied to `synthid-text-watermarking`. `llm-field-guide.html` also
+      has `.eq__math` blocks and hasn't been checked yet (the run timed out in this
+      environment); check it too.
 - [ ] **Full-text search.** The index currently searches title, authors, venue, tags and
       the card hook only. Fine at a handful of resources, weak past ~20. Bake a
       per-resource text index into `index.html` at rebuild time and search that — keeping
@@ -338,4 +341,6 @@ source that caused it.
 - [x] Recover vector figures by rendering the region above a caption — the embedded-image
       pass alone found zero figures in the first real paper.
 - [x] Stop page logos and neighbouring captions leaking into figure crops.
+- [x] `verify_page.py` now checks `.eq__math` for silent horizontal overflow, the same
+      pattern as the wide-table scroll-container check.
 - [x] Keep numeric table cells from breaking mid-value; let wide tables use the margin.
