@@ -198,13 +198,13 @@ the machinery that constructs it. Let F stand for the whole collection of functi
 the assembler A, the retriever, the selector, the compressor, everything:</p>
 
 <div class="eq">
-  <div class="eq__math">F* = arg max<sub>F</sub> 𝔼<sub>τ∼𝒯</sub> [ Reward( P<sub>θ</sub>(Y | C<sub>F</sub>(τ)), Y*<sub>τ</sub> ) ]&nbsp;&nbsp;&nbsp;subject to&nbsp;&nbsp;|C| ≤ L<sub>max</sub></div>
-  <div class="eq__read"><strong>In words</strong>Search over context-building pipelines, not
+  <div class="eq__math">F* = argmax<sub>F</sub> 𝔼<sub>τ∼𝒯</sub>[Rew(P<sub>θ</sub>(Y|C<sub>F</sub>(τ)),Y*<sub>τ</sub>)]</div>
+  <div class="eq__read"><strong>In words</strong>(Rew is short for Reward.) Search over context-building pipelines, not
   over prompt strings. For a whole distribution of tasks 𝒯, draw a task τ, let the pipeline F
   build a context for it, run the model, and score the output against the ideal answer
   Y*<sub>τ</sub>. The best pipeline F* is the one with the highest average score across the
-  task distribution — subject to the hard constraint that the assembled context must fit in
-  the model's window, L<sub>max</sub>. Two things changed from prompt engineering: we optimise
+  task distribution, subject to a hard constraint not shown above: the assembled context must fit in
+  the model's window, |C| ≤ L<sub>max</sub>. Two things changed from prompt engineering: we optimise
   a <em>system</em> rather than a string, and we optimise for a <em>distribution</em> of tasks
   rather than the one in front of us.</div>
 </div>
@@ -216,8 +216,8 @@ maximise the <strong>mutual information</strong> between the retrieved knowledge
 correct answer:</p>
 
 <div class="eq">
-  <div class="eq__math">Retrieve* = arg max<sub>Retrieve</sub> I( Y* ; c<sub>know</sub> | c<sub>query</sub> )</div>
-  <div class="eq__read"><strong>In words</strong>Mutual information I(X;Z) measures how much
+  <div class="eq__math">R* = arg max<sub>R</sub> I( Y* ; c<sub>k</sub> | c<sub>q</sub> )</div>
+  <div class="eq__read"><strong>In words</strong>R stands for the retrieval step, c<sub>k</sub> for the retrieved knowledge and c<sub>q</sub> for the query already in context. Mutual information I(X;Z) measures how much
   knowing Z reduces your uncertainty about X. So this says: retrieve the knowledge that most
   reduces uncertainty about the correct answer, <em>given</em> that we already have the query.
   The conditioning is the important part — it discounts anything the query already told us. A
@@ -664,14 +664,14 @@ Sinks</em>. ICLR, 2024.</li>
 
   <footer class="colophon">
     <p>Explained and published in the AI Library on 02 August 2026.</p>
-    <p>This page is a plain-English explanation written from the source listed above — read the
-       original for the authors' own words, exact numbers and full method details.</p>
+    <p>This page is a plain-English explanation written from the source listed above — read the original for the authors&#x27; own words, exact numbers and full method details.</p>
     <p><a href="../index.html">← Back to the library</a></p>
   </footer>
 
 </main>
 
 <script src="../assets/app.js"></script>
+
 
 </body>
 </html>

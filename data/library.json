@@ -1,5 +1,26 @@
 [
   {
+    "slug": "synthid-text-watermarking",
+    "title": "Scalable watermarking for identifying large language model outputs",
+    "type": "paper",
+    "authors": "Sumanth Dathathri, Abigail See, Sumedh Ghaisas, Po-Sen Huang, Rob McAdam, Johannes Welbl, Vandana Bachani, Alex Kaskasoli, Robert Stanforth, Tatiana Matejovicova, Jamie Hayes, Nidhi Vyas, Majd Al Merey, Jonah Brown-Cohen, Rudy Bunel, Borja Balle, Taylan Cemgil, Zahra Ahmed, Kitty Stacpoole, Ilia Shumailov, Ciprian Baetu, Sven Gowal, Demis Hassabis, and Pushmeet Kohli",
+    "venue": "Nature",
+    "year": 2024,
+    "tags": [
+      "ai-policy",
+      "production",
+      "evaluation",
+      "security"
+    ],
+    "hook": "DeepMind's production watermark for LLM text: a knockout tournament among candidate tokens, refereed by a secret key, that leaves a statistical signature detectable without ever touching the model — validated live in Gemini across nearly 20 million responses with no measurable loss in quality.",
+    "read_minutes": 20,
+    "words": 4465,
+    "page": "pages/synthid-text-watermarking.html",
+    "source_url": "https://www.nature.com/articles/s41586-024-08025-4",
+    "pdf": null,
+    "added": "2026-08-15"
+  },
+  {
     "slug": "stealing-reasoning-traces",
     "title": "Stealing Reasoning Traces from Proprietary LLM APIs",
     "type": "paper",
@@ -14,7 +35,7 @@
     ],
     "hook": "Providers hide a reasoning model’s chain-of-thought behind an encrypted blob you pass back with every request — and that blob turns out to be readable by any weaker, less-guarded model from the same provider. The authors used the gap to pull 315,320 hidden reasoning traces out of publicly shared agent logs, recover live API keys and other credentials, and find early behavioral evidence that a couple of open-weight models may already answer unusually like Claude and GPT-5.6 mid-thought.",
     "read_minutes": 28,
-    "words": 6094,
+    "words": 6108,
     "page": "pages/stealing-reasoning-traces.html",
     "source_url": "https://arxiv.org/abs/2608.09867",
     "pdf": null,
@@ -145,7 +166,7 @@
     ],
     "hook": "Prompt engineering stopped describing what people actually build. This survey reads 1,400 papers to argue that retrieval, memory, tool use and multi-agent coordination are one discipline — and finds models understand context far better than they can generate it.",
     "read_minutes": 25,
-    "words": 5508,
+    "words": 5526,
     "page": "pages/context-engineering-survey.html",
     "source_url": "https://arxiv.org/abs/2507.13334",
     "pdf": null,
@@ -167,7 +188,7 @@
     ],
     "hook": "Agents were made to extend their own code across up to eight rounds of changing specifications. None finished a single problem, and what they left behind got measurably worse every round — while human repositories stayed flat.",
     "read_minutes": 23,
-    "words": 5016,
+    "words": 5012,
     "page": "pages/slopcodebench.html",
     "source_url": "https://arxiv.org/abs/2603.24755",
     "pdf": "assets/pdf/slopcodebench.pdf",

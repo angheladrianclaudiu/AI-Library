@@ -159,6 +159,16 @@ Then say plainly, in your report to the user, **which findings you rejected and
 why.** The rejections are as much a result as the fixes, and they are what tells
 the user how much to trust the rest.
 
+**One round of two adversaries is not proof the page is now correct.** Every
+time this project has run a second independent round after a first round's
+fixes — same page, same source, told explicitly not to trust the prior
+round — it has found further real defects, including defects the first
+round's own fixes introduced. Plan for at least two full cycles (brief →
+adjudicate → fix → re-verify) on anything that isn't a trivial correction, and
+keep going until a cycle returns nothing beyond findings already covered by
+established precedent. Say in your report how many cycles it took, not just
+the final state — that number is itself useful to the next session.
+
 ### 6. Fix in the JSON and rebuild
 
 Edit `inbox/<slug>.content.json`, never the HTML. Each section's `html` field is
@@ -270,3 +280,25 @@ a row now have had a figure whose axis, ordering or plotted values contradict
 what the caption claims. Treat this as the default expectation rather than bad
 luck, and check the figure itself, not the caption — a caption is the authors'
 claim about a figure.
+
+**A figure crop that does not survive being checked against its own caption.**
+A different failure from the one above: not the source's caption disagreeing
+with the data, but *this page's* alt text and caption describing content —
+a second panel, a labelled reference line, page furniture like a running head —
+that simply is not in the saved image file. Invisible unless you open the crop
+and read it cold, as if you had never seen the source's original figure.
+
+**A fix introducing the same class of defect it was written to prevent.** A
+sentence added specifically to close a fidelity gap can drop a hedge, add an
+unearned scope word, or otherwise repeat the error one level down, precisely
+because it was written under the same pressures (compress, sound confident) as
+the original. A round that only diffs against the prior round's findings will
+miss this; only a check against the primary source catches it.
+
+**A claim that is true at one level of the source's own guarantees and stated
+as if true at another.** The subtlest fidelity failure recorded so far: a
+number or property the source proves under a specific, narrow condition,
+repeated on the page as an unconditional fact. Nothing about the sentence
+reads as wrong in isolation — it only surfaces when every claim about the same
+property, wherever it appears on the page, is checked against each other and
+not just against its own nearest source passage.

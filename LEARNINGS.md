@@ -22,6 +22,15 @@ without the source that produced it is not much use to the next session.
   obvious the moment the image was opened.
 - **Metadata heuristics fail quietly.** An empty `authors` field is easy to miss and ends
   up as a page with no byline.
+- **One adversarial review round is never enough — every round run so far has found real
+  defects, on every page tried, including pages a previous round had already fixed.**
+  Sessions 4, 8, 12, 14 and 15 each found genuine, distinct fidelity or craft issues on a
+  page that had already passed at least one review. Session 15 found defects session 14's
+  own fixes had introduced. Treat a clean-looking round as the surprising result requiring
+  double-checking, not the default — and budget for at least two full cycles (brief →
+  adjudicate → fix → re-verify), stopping only when a cycle returns nothing beyond findings
+  already rejected by precedent. `add-resource` step 9 and `review-resource`'s workflow both
+  now require this explicitly rather than leaving it to session judgement.
 
 ---
 
@@ -1126,7 +1135,142 @@ recording a clean bill of health it had not earned.
 
 ---
 
-## Session template
+## Session 13 — Scalable watermarking for identifying large language model outputs (Nature, DOI 10.1038/s41586-024-08025-4)
+
+**Source:** 14 pages, ~10,300 words, 4.3 MB. A Springer/Nature production PDF (`Producer: Springer`), DeepMind's SynthID-Text paper — a third distinct PDF pipeline for this library alongside arXiv LaTeX and Google Docs exports. Three main-text vector figures plus four Extended Data figure grids and one Extended Data table, all embedded rasters.
+
+**What worked first time:**
+
+- **`pdf_metadata.doi`** carried a clean DOI (`10.1038/s41586-024-08025-4`) even though `find_arxiv_id()`/`source_url` correctly came back `null` — this paper has no arXiv presence at all. The DOI is what let `https://www.nature.com/articles/s41586-024-08025-4` be constructed with no network access and no user prompt, extending session 10's finding (a user volunteering the link isn't the only way to avoid a stall) with a second: **check `pdf_metadata.doi` before asking the user**, the same way session 9/10 learned to check `pdf_metadata.title`.
+- **Title and year both landed clean.** A Springer export apparently writes metadata as reliable as a Google Docs export or a clean LaTeX build — three production pipelines now, zero metadata failures between them, all Google-Docs/Springer/LaTeX rather than scanned or hand-assembled PDFs.
+- **The embedded-image pass alone was sufficient**, fourth time running for a paper whose figures are pre-rendered raster charts rather than vector diagrams: 8 candidates for 8 real figures, no cropping needed, no icon-decoration pollution.
+
+**What broke:**
+
+1. **The Fig. 2 walkthrough text's own exponent was flattened by extraction, and it was checkable only by cross-referencing three places in the same paper.** The body text read "we start by sampling M = 2m candidate tokens", which is arithmetically impossible for a tournament that halves candidates every round (it needs a power of two). The figure's own caption gave the resolution — "we sample 2m = 8 (possibly non-unique) tokens" — where 2³ = 8 confirms the source meant 2^m, not 2·m, and the formal Algorithm 2 in Methods independently confirms it by drawing "N^m" samples for general match size N. Same failure class LEARNINGS has recorded before (session 11's τⁿ vs τₙ superscript/subscript mixup) but at a layer up: this one hides in body *prose describing an equation*, not in an equation itself, so it wouldn't be caught by re-reading rendered `.eq__math` — only by reconciling three separate passages against each other. Rendered on the page as "Nᵐ" and "2ᵐ" using Unicode superscript m (U+1D50, ᵐ).
+2. **`.eq__math` uses `white-space: pre` with horizontal scroll, which silently breaks on an equation that's really a description in disguise.** Two `.eq` blocks were drafted for this page: a genuine formula (the mean-score equation) and a paraphrase of the tournament *procedure* dressed up as one-line pseudocode ("Draw Nᵐ candidates → group → round ℓ keeps the gℓ-winner → repeat → one token remains"). Both overflowed their box at desktop width (`scrollWidth` 1685px and 1020px against a 672px container) — checked with `el.clientWidth`/`el.scrollWidth` in Playwright, not caught by eye, since `overflow-x: auto` hides it behind an unlabelled scrollbar rather than visibly breaking. The genuine formula was fixed by writing it compactly (`Score(x) = 1/(mT) · Σₜ,ℓ gℓ(xₜ, rₜ)`, with the summation bounds moved into the prose reading) and shrank to fit with room to spare. The procedural one was **not** an equation at all by the writing guide's own test ("if an equation cannot survive that treatment, leave it out and describe the operation in prose instead") — deleted the `.eq` wrapper and folded it into an ordinary paragraph, which is what it already was in substance. **Worth a standing check**: any `.eq__math` line should be measured (`scrollWidth` vs `clientWidth`) before shipping, the same way a wide table already gets checked — the component silently accepts arbitrarily long content and only the browser reveals when that stops being a formula.
+
+**Non-extraction findings:**
+
+- **A same-genre precedent didn't exist for this source, so the depth call was made from the rubric alone.** At 14 pages / ~10,300 words this sits in the "standard 8–12pp conference paper" rubric row despite being a Nature article, because Nature's own format (dense two-column-equivalent prose, Methods pushed to the back half) reads shorter than the page count suggests. The finished page landed at 3,644 words / 17 min, near the upper end of that row's target — justified by the source's own density (a full sampling-algorithm specification plus a three-baseline empirical comparison) rather than padding.
+- **Choosing 4 figures out of 8 candidates meant dropping three redundant Extended Data grids and converting one Extended Data table from image to real markup, not just picking a subset by eye.** Extended Data Figs. 1–3 (pages 10–12) each re-ran Fig. 3's own comparisons across additional models/temperatures/lengths as 9-panel grids — informative but strictly denser versions of a point Fig. 3 already makes, so all three were deleted from `assets/images/`. Extended Data Fig. 4 (page 13, diversity-vs-detectability) was kept because it measures something Fig. 3 doesn't cover at all (response diversity). Extended Data Table 1 (page 14, human preference ratings) was deleted as an image and rebuilt as an actual `<table class="numeric">` inside `.table-scroll.wide` — six columns of real numbers read far better as text than as a screenshotted table, and it's the kind of content the writing guide's table component exists for.
+- **A 24-author byline was written out in full**, following `context-engineering-survey`'s 15-author precedent over any impulse to truncate to "et al." — the library's working convention for multi-author bylines is apparently "list everyone", not "list the first author and count".
+
+**Tooling notes for this environment:**
+
+- **This session's Playwright install pinned a newer bundled Chromium (`chromium_headless_shell-1234`) than what's actually on disk (`chromium-1194`)**, a fresh variant of session 8's Windows-path problem. Same fix generalizes: pass `executable_path` explicitly (`AI_LIBRARY_CHROMIUM=/opt/pw-browsers/chromium-1194/chrome-linux/chrome`) rather than letting Playwright resolve its own — the env var `verify_page.py` already supports for Windows turned out to be exactly what a Linux version-skew case needed too.
+- **`el.screenshot()` on a Playwright `ElementHandle` clips to the element's actual layout box**, which made the `.eq__math` overflow bug visible in a screenshot before it was confirmed numerically — the box appeared to truncate text mid-word rather than wrap. Useful as a fast visual smoke test, but the `clientWidth`/`scrollWidth` JS check is what actually proves the defect rather than suggesting it.
+
+---
+
+## Session 14 — reviewing the synthid-text-watermarking page (no new ingest)
+
+**Source:** the session 13 page itself, 8 sections and ~3,900 words, re-checked against `s41586024080254.pdf` with `inbox/` still intact. A single Opus-5 subagent was briefed with a combined fidelity-plus-craft thesis and given the page, the page-marked source text, the content JSON, the figures JSON and the writing guide — the session 9/11 pattern, not the two-blind-agent protocol — then every finding was independently re-verified against the source before any fix was applied.
+
+**The headline: the agent's single most serious finding was a bug the ingest session's own figure-selection step should have caught and didn't.** `fig-p02-fig-1.webp` was cropped from the caption-region renderer to include only the *bottom* panel of the source's Fig. 1 (the "generative watermarking" diagram); the *top* panel ("LLM text generation", a simpler loop with no watermarking key) never made it into the crop. The page's `alt` text and figcaption nevertheless described "Top: ordinary LLM text generation as a loop… Bottom: generative watermarking adds…" — a description of content that was not in the image. This is sessions 1–3's core lesson ("every crop needs looking at") failing on a page where the crop *was* looked at (LEARNINGS session 13 records viewing this exact image before selecting it) — the image was checked for being **legible**, not for being **complete against the caption it was about to receive**. Those are different checks, and only the second one catches a crop that is internally fine but missing a whole panel. Fixed by re-rendering the region directly from the PDF page with `fitz`/PyMuPDF at the actual text-block bounding box (found via `page.get_text('dict')`, not eyeballed) rather than trusting the extractor's caption-region heuristic a second time.
+
+**What else the agent found, confirmed against the source, and fixed** — eighteen further fidelity issues, none as severe as the figure but all real:
+
+- **A figure caption asserted a pattern the figure itself contradicts.** "The gap [between SynthID-Text and Gumbel sampling] widest on short, low-entropy text" — read directly off the plotted points, the gap is *smallest* at the shortest length shown (50 tokens) and largest around 100. The source ties the improvement to *temperature and model size* (Extended Data Fig. 1's caption, cited but not read closely enough during the ingest), never to text length. Two different axes of "low entropy" got conflated into one claim, stated confidently, in both the figcaption and the body paragraph right below the figure that disproves it — a new variant of the figure-contradicts-the-prose pattern sessions 2/3/7/8 already recorded, except here the contradiction is *within one paragraph of its own figure* rather than between two different parts of the page.
+- **A source condition was inverted.** "the exact same context window can recur… especially in *short* or repetitive text" against the source's "if the sliding-window size H is small **or the response is long**." Long, not short — more tokens generated means more chances for a fixed 4-token window to repeat. A plausible-sounding intuition substituted for the source's actual (opposite, and correct) one.
+- **Three "to our knowledge" / "to the best of our knowledge" hedges got dropped into flat assertions** — the production-deployment "first of its kind" claim, the speculative-sampling-plus-watermarking novelty claim, and (implicitly) the "no equivalent prior deployment exists" gloss added on top of the first. All three now read as claims properly scoped to the paper's own priority assertion rather than the page's independent verification of it.
+- **A misplaced quote.** The Limitations section's opening blockquote — "no text detection method is foolproof, and many of the approaches discussed **in this section**…" — was lifted from the paper's *introduction* (its survey of retrieval/post-hoc/edit-based/data-driven approaches), not its Limitations section. Under an AI-Library heading called "Limitations", "this section" now pointed at nothing — the referent broke on the move. Replaced with an actual sentence from the paper's own Limitations section that needs no antecedent.
+- **A vocabulary swap that would actively mislead a reader learning the terms from this page**: "the paper's own baselines — Gemma and Mistral" — Gemma and Mistral are the *models watermarked in the evaluation*; the baselines are Gumbel sampling and Soft Red List, correctly named two paragraphs earlier. Easy to make (both are "the other things in the comparison") and exactly the kind of error a page's own glossary can't catch because the wrong word is a real term, just the wrong one.
+- **Two instances of a single failure shape**: the page's own inference — that lower model entropy in larger/RLHF'd models creates a future problem for detectability — got attributed to "the paper" ("a tension the paper flags but doesn't resolve") in two separate sections. The source states the entropy factors neutrally, in a different section, with no framing as a tension at all. The inference is sound; the attribution wasn't the page's own voice. Fixed in both places by rewording to own the inference explicitly, matching the pattern the page already got right elsewhere (the "that is their characterization of their own product" sentence in why-it-matters, which the review confirmed as correctly attributed).
+- **Attribution owed to prior work, not restated.** Repeated context masking itself is cited to ref. 27 (Hu et al.); SynthID-Text's own contribution is the *K-sequence generalization*. The page's original wording ("SynthID-Text's fix, K-sequence repeated context masking...") credited the whole mechanism to this paper. The writing guide's "say what was actually new" rule exists for exactly this shape of slip, and it isn't a subtle one to check — the source names its own citation right there in the sentence.
+- **An unverifiable characterization of "prior work" deleted rather than fixed.** "Instead of directly reweighting the model's probabilities (the usual approach in prior work)" characterized baseline methods whose actual description the paper defers to Supplementary Information — material this page's own Sources section already discloses as unreviewed. Rather than guess at what the SI says, the clause was cut; the sentence loses nothing describing what Tournament sampling itself does.
+- **The equation section stated a formula as though it were what produced the headline numbers.** The mean-g-value score is the *simplest* of several scoring functions the paper proposes; page 8's "SynthID-Text settings" specifies the Bayesian variant as what every main-text experiment actually used, including Figure 3. One sentence added to close the gap between "the formula on this page" and "the formula behind these results" — the same species of gap session 11 found in a different paper (a scoring-function detail that changes what a results figure actually represents).
+- **A mechanism explanation left an apparent internal contradiction unaddressed.** Nᵐ candidates with the paper's own m = 30 implies ~10⁹ candidate draws per token, which cannot be reconciled with a reported 0.57% latency overhead without the one sentence the source itself supplies (a vectorized implementation exists, detailed in an SI section this page doesn't have access to). Not something the *reviewing* agent flagged as a numeric error — the arithmetic is consistent with the source — but a legitimate craft finding: a reader who does the multiplication hits a wall the page gave them no way through.
+- **Smaller ones, same pattern throughout**: units silently reinterpreted ("0.01%" to "0.01 percentage points", with the paper's own definition — a share of thumbs-up/down feedback specifically, not of all responses — dropped in the same edit); a table reproduced from an Extended Data image with no source line, where every figure on the page carries one; a superscript used where the source's variable is a subscript (`x₁,…,xᵀ`, "x to the T", for what should read "the last token x_T"); two unclosed `<p>` tags inherited from the original content JSON's f-string construction; a first-use gloss of "entropy" reading self-contradictory ("the same answer regardless of which token gets sampled") where the source's own phrasing ("almost always returns the exact same response") says the same thing correctly; an artefact-leaving property attributed to only one of the two prior-work approaches the source attributes it to jointly.
+
+**What the review confirmed as solid, and did not touch:** every number in the human-preference table (recovered from an embedded PDF image the text extractor never captured — the agent rendered the region at 220 dpi and read all 35 cells by eye, matching exactly), the latency figures, the Tournament-sampling mechanics and the non-distortionary/distortionary N=2-vs-N>2 distinction, the full 24-author byline, the DOI/URL/volume/page numbers, every figure's colour-to-series assignment (including catching that Fig. 3 and Extended Data Fig. 4 use *opposite* palettes for the same two methods, and that both figcaptions got it right), citation resolution, class usage against `style.css`, and the "no hype" / prose-over-bullets / tense-consistency checks. Recording this because a review that only lists what's broken is exactly the failure mode session 8 warned about — most of the page held up under a genuinely adversarial pass.
+
+**On briefing a subagent to find figure/caption mismatches specifically.** The brief explicitly asked the agent to "look at the four figure images the page actually uses… to check the page's alt text and captions against what the images actually show" — a step distinct from checking factual claims against source text, and it's the one that caught the session's worst finding. Worth making a standing instruction for any review, not just this one: an alt text and a caption are claims about an image the same way a sentence is a claim about a source, and they need the same look-at-the-primary-thing treatment, not a re-read of the extraction pipeline's own caption text.
+
+**Tooling notes for this environment:**
+
+- **Locating a figure's true crop bounds precisely, rather than eyeballing a `clip` rectangle, is a five-line fix.** `page.get_text('dict')` returns exact span bounding boxes; searching for the two panel-heading strings and taking the union of everything between them (plus a small pad) reproduced a correct two-panel crop on the first attempt, no trial and error. Worth defaulting to this over guessing pixel coordinates whenever a re-crop is needed mid-review, not just during initial extraction.
+- **The background-subagent review pattern (session 9/11's single combined pass) scales to a second full round on a page that already had zero prior review**, unlike sessions 9/11/12 which reviewed pages that had already shipped. Running it as part of the same ingest session, before commit, cost about ten minutes of agent time and caught a defect that would otherwise have gone out under a `figsrc` crediting the correct page — the kind of error a fast human skim of the finished page does not catch, because the caption reads fluently and the image looks like a real Figure 1 either way.
+
+---
+
+## Session 15 — a third adversarial pass on synthid-text-watermarking (no new ingest)
+
+**Source:** the session 13/14 page again, this time explicitly briefed as a check on the *fixes* session 14 applied, not just the original page. Third data point (after sessions 9/11 vs. session 12) on whether one same-session pass is enough — and the second time running this session's answer is "no": a genuinely independent second read, told outright not to trust the prior round's corrections, found 20 further fidelity issues and 8 craft issues on a page that had already been through one full adversarial cycle. None were as severe as session 14's missing figure panel, but several were the same *shape* of error the first round already fixed, just relocated: a hedge dropped in a newly-written sentence, a scope word ("production" for "experimental") introduced by a fix rather than removed by one, an internal contradiction between two passages written in different rounds.
+
+**The two most instructive findings, because they're about editing rather than extracting:**
+
+1. **A fix can introduce the exact defect class it was written to prevent.** Session 14's new aside about the tournament's `Nᵐ` candidate count at `m = 30` called it "the paper's production setting" — but the source only ever calls `m = 30` an *experimental* setting, and the page's own next paragraph says so correctly ("the paper's main experiments use m = 30"). The aside was added specifically to close a gap the first review found; writing it introduced a new, smaller version of the same species of error (an unearned specificity claim) two sentences from a correct one. Nothing about editing under review pressure makes a page immune to the mistakes the review pressure exists to catch.
+2. **An unqualified positive claim survived two adversarial rounds because it was true at the wrong scope.** "No quality cost" for non-distortionary SynthID-Text is exactly what the paper's own theorem proves — for a single token, averaged over seeds. What neither the ingest nor the session-14 review caught is that the paper is explicit, twice, that this comes in *graded levels* with costs at both ends, and that the deployed (sequence-level) configuration is stated in the main text to cost "some reduction to inter-response diversity" — a fact the page had already correctly reported inside a figure caption without ever connecting it to the TLDR's flat "no quality cost" three sections earlier. A true claim, correctly sourced, at the wrong level of the paper's own hierarchy of guarantees, is a harder bug to catch than a false one — nothing about it reads as wrong locally, and the second reviewer only found it by holding the whole page's claims about the same property next to each other rather than checking each sentence against its own nearest source passage.
+
+**What else this round found, confirmed and fixed:** two attack-type glosses (spoofing/scrubbing) that had been flagged as confusable in round one and never actually fixed — a reminder that a review's own "worth fixing" list needs to be checked off, not just written down; a citation credited to the wrong single source when the paper co-credits two (the sliding-window seed generator, cited to both Aaronson & Kirchner *and* Kirchenbauer et al., where the page's bibliography entry only named the first); a base technique (repeated context masking) named as "an existing technique" with no citation at all — the paper names it (Hu et al., ref. 27) and the page didn't, so a reader had a claim of prior art with no way to find the prior art; a "best prior scheme" hedge dropped from a sentence that had correctly kept its "to our knowledge" hedge two paragraphs over; a figure's own running-head ("Article", the journal's page furniture) baked into a cropped image with no mention in the alt text, caught only by re-rendering the source page and comparing pixel regions, not by reading the crop in isolation; a structural placement bug (Figure 1 introduced in the first sentence of a section, then not shown until three subsections later, sandwiched against Figure 2) that no fidelity check would ever catch because nothing in it is factually wrong.
+
+**What held up a third time:** every number in the human-preference table (independently re-derived by a third agent rendering the same PDF region), all latency figures, every method parameter (H, m, N, K, the Bernoulli distribution), the corrected Figure 1 crop and its caption, the "learned Bayesian scoring function" addition from round one (independently verified as accurate and well-attributed), and all five evaluation conditions in the rewritten Figure 3 caption. Recording this because it means the fixable defects are getting rarer with each pass, not that the page was clean underneath — genuinely nothing token 1's crop-completeness class of bug turned up this time.
+
+**On running a third round at all.** Sessions 9 and 11 concluded one pass "appears to be enough"; session 12 found that wrong on a different page; this session finds it wrong again, on the *same* page, on the *second* pass. Three data points now say a single review — even a good one — leaves real, findable defects on the table, and that the marginal round still pays for itself as long as it's genuinely independent (told explicitly not to trust the prior round, given the same primary-source access, and free to re-examine everything rather than only the diff). Whether a fourth round would still find something is untested; nothing here suggests the series converges to zero rather than just getting sparser.
+
+---
+
+## Session 16 — fixing the equation overflow bug on four already-published pages (no new ingest)
+
+**Source:** none — a follow-up to session 15's `verify_page.py` change, fixing the four
+pages the new `.eq__math` overflow check flagged: `context-engineering-survey`,
+`slopcodebench`, `stealing-reasoning-traces` and `llm-field-guide`. Six overflowing
+equations across the four pages, all fixed the same way: shorten the formula and move
+anything cut into `.eq__read`, or — for `llm-field-guide`'s KV-cache formula, which is
+long because every variable name is intentionally descriptive rather than a single
+letter — wrap it onto multiple lines inside the `white-space: pre` block instead of
+abbreviating the names, since the readability of `kv_heads`/`bytes_per_value` is the
+point of that particular equation.
+
+**What worked first time:**
+
+- `stealing-reasoning-traces` has a committed builder script
+  (`assets/scripts/stealing-reasoning-traces.build_content.py`); running it reproduced
+  the committed page byte-for-byte before any edit, confirming the safe starting point
+  without needing `recover_content_json.py` at all.
+- For the other three, `recover_content_json.py --verify`'s round-trip failed on the
+  already-documented harmless diff (session 6: a hard-wrapped colophon paragraph and an
+  apostrophe entity) for `context-engineering-survey` and `slopcodebench` — expected, and
+  the recovered JSON was safe to use.
+- Shortening a formula by tightening spacing and moving descriptive clauses into
+  `.eq__read` (rather than deleting content) held up across every fix — nothing was lost,
+  each equation just got more compressed. Confirmed each one still renders correctly and
+  reads sensibly with a phone-width screenshot before moving to the next page.
+
+**What broke:**
+
+1. **`recover_content_json.py`'s round-trip failure on `llm-field-guide` was not the
+   known harmless diff — it silently dropped two real fields.** The recovered JSON fell
+   back to the generic guide default colophon text instead of the page's actual custom
+   `colophon_note`, and dropped `"scripts": ["assets/fieldguide.js"]` entirely. Rebuilding
+   from that recovery without reading the diff closely would have shipped a page with
+   every interactive widget dead (no script tag to load `fieldguide.js`) and the guide's
+   real attribution swapped for boilerplate — a much worse outcome than the equation bug
+   being fixed. Caught only because the `--verify` diff was read line by line instead of
+   pattern-matched against the session-6 precedent and dismissed. Fixed by hand-patching
+   both fields into the recovered JSON from the diff's own "before" text, then confirming
+   a genuinely byte-exact round-trip before touching anything else. Logged in `TASKS.md`
+   — `recover_content_json.py` should detect a non-default footer paragraph and a
+   post-`app.js` script tag and recover both automatically.
+2. **`colophon_note` needed a list, not a string, to reproduce two separate `<p>` tags**,
+   and needed each list item to start with `<p>` so `as_paragraphs()` passed it through
+   unescaped — passing plain strings round-tripped with `'` silently converted to
+   `&#x27;`, which is the exact session-6 diff shape, this time self-inflicted rather than
+   inherited.
+3. **Fixing the equation on `slopcodebench` surfaced a second, unrelated bug in the same
+   `verify_page.py` run**: five bibliography entries with zero inline citations anywhere
+   in the body, the same failure session 10 recorded on a different page. Left unfixed
+   and logged in `TASKS.md` rather than expanding this session's scope — but worth noting
+   that running the checker for one reason surfaced an unrelated real defect for free,
+   which is the same thing that happened when the `.eq__math` check itself first shipped.
+
+**Tooling notes for this environment:**
+
+- **`verify_page.py` on `llm-field-guide` needs a long timeout, not a fix.** The first
+  attempt hit the harness's 2-minute default and looked like a hang; a 240-second budget
+  completed normally. The guide has more images and interactive widget JS than a typical
+  paper page, and that's just slower to settle to `networkidle`, not broken.
 
 ```
 ## Session N — <title> (<identifier>)

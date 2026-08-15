@@ -160,6 +160,24 @@ source that caused it.
 
 ## Site and HTML
 
+- [ ] **`slopcodebench` has a fully populated bibliography with zero inline citations
+      pointing to it.** Five entries (`r1`–`r5`: the paper itself, the benchmark's own
+      data/code release, McCabe's complexity measure, SWE-bench, and Ward Cunningham's
+      technical-debt paper) and not one `class="cit"` link anywhere in the body — the exact
+      failure session 10 recorded on a different page (`LEARNINGS.md`), caught here by
+      `verify_page.py`'s existing orphaned-bibliography check rather than by eye. Needs the
+      content JSON recovered and an inline `<a href="#rN" class="cit">` added at the
+      sentence discussing each source.
+- [ ] **`recover_content_json.py` doesn't reconstruct a custom `colophon_note` or a
+      `scripts` array.** Found recovering `llm-field-guide`: the script fell back to the
+      generic guide default colophon text and silently dropped
+      `"scripts": ["assets/fieldguide.js"]` — which, if rebuilt without noticing, would have
+      shipped a page with every interactive widget dead (no `fieldguide.js` load) and the
+      guide's actual attribution note replaced with boilerplate. Caught only because
+      `--verify`'s byte-exact diff failed and got read closely rather than dismissed as the
+      routine colophon-wrap/apostrophe difference. Fix: detect a footer paragraph that
+      doesn't match either `COLOPHON_NOTES` default and recover it as `colophon_note`;
+      detect a `<script src="../assets/…">` after `app.js` and recover it as `scripts`.
 - [ ] **Full-text search.** The index currently searches title, authors, venue, tags and
       the card hook only. Fine at a handful of resources, weak past ~20. Bake a
       per-resource text index into `index.html` at rebuild time and search that — keeping
@@ -330,4 +348,9 @@ source that caused it.
 - [x] Recover vector figures by rendering the region above a caption — the embedded-image
       pass alone found zero figures in the first real paper.
 - [x] Stop page logos and neighbouring captions leaking into figure crops.
+- [x] `verify_page.py` now checks `.eq__math` for silent horizontal overflow, the same
+      pattern as the wide-table scroll-container check.
+- [x] Fixed the four `.eq__math` overflow bugs the new check found on
+      `context-engineering-survey`, `slopcodebench`, `stealing-reasoning-traces` and
+      `llm-field-guide` (six equations across the four pages).
 - [x] Keep numeric table cells from breaking mid-value; let wide tables use the margin.

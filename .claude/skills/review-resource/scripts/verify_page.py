@@ -21,10 +21,17 @@ each session rediscovers the same two traps. Both are encoded here:
     and inspect `request.url` instead. Google Fonts is blocked by this
     environment's egress policy and is expected to fail; anything else is not.
 
-Checks: no body overflow, scroll containers behave, every image decodes, every
-TOC and citation anchor resolves, the bibliography has no dangling or unused
-ids, the theme toggle flips and survives a reload, and on the index the card
-appears and both search and the tag chips narrow to it.
+  * `.eq__math` is `white-space: pre` with `overflow-x: auto`, so a formula
+    too long for its box scrolls silently instead of visibly breaking — the
+    same shape of bug as the table check above, but easy to miss because
+    nothing looks wrong in a screenshot. synthid-text-watermarking shipped
+    two overflowing equations this way before the check below existed.
+
+Checks: no body overflow, scroll containers behave, equation blocks fit their
+box, every image decodes, every TOC and citation anchor resolves, the
+bibliography has no dangling or unused ids, the theme toggle flips and
+survives a reload, and on the index the card appears and both search and the
+tag chips narrow to it.
 """
 
 from __future__ import annotations
@@ -126,6 +133,19 @@ def main() -> int:
                         check(fits, f".table-scroll[{i}] is wider than the body ({cw}px)")
                         if not scrolls and sw == cw:
                             pass  # a narrow table that genuinely fits is fine
+                    for i, box in enumerate(
+                        page.evaluate(
+                            "[...document.querySelectorAll('.eq__math')].map(d =>"
+                            " [d.scrollWidth <= d.clientWidth + 1, d.scrollWidth, d.clientWidth])"
+                        )
+                    ):
+                        fits, sw, cw = box
+                        check(
+                            fits,
+                            f".eq__math[{i}] overflows its box ({sw}px content in {cw}px) — "
+                            "shorten the formula or move the extra text into .eq__read",
+                        )
+
                     broken = page.evaluate(
                         "[...document.images].filter(i => !i.naturalWidth)"
                         ".map(i => i.getAttribute('src'))"

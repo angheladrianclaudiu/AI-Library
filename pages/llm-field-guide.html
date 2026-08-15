@@ -143,7 +143,7 @@ head dimension, softmax each row into probabilities, then mix the values with th
 probabilities<a href="#r2" class="cit">2</a>.</p>
 
 <div class="eq">
-  <div class="eq__math">Attention(Q, K, V) = softmax( Q&middot;K&#7488; / &radic;d ) &middot; V</div>
+  <div class="eq__math">Attention(Q,K,V) = softmax(Q&middot;K&#7488;/&radic;d)&middot;V</div>
   <div class="eq__read"><strong>In words</strong>Compare every query against every key with a dot
   product, which is large when two vectors point the same way. Divide by &radic;d, the square root
   of the head dimension, so the scores stay in a range softmax can work with. Turn each row of
@@ -375,7 +375,9 @@ cached &mdash; and that cache is what actually limits how long a conversation ca
 context is not a feature. It is a memory bill you pay every step.</p>
 
 <div class="eq">
-  <div class="eq__math">cache_bytes = 2 &times; layers &times; kv_heads &times; head_dim &times; tokens &times; batch &times; bytes_per_value</div>
+  <div class="eq__math">cache_bytes = 2 &times; layers &times; kv_heads
+            &times; head_dim &times; tokens
+            &times; batch &times; bytes_per_value</div>
   <div class="eq__read"><strong>In words</strong>The leading 2 is one key and one value per
   position. Multiply by how many layers keep a cache, how many key/value heads each layer has, how
   wide each head is, how many tokens are in the window, how many requests you are serving at once,

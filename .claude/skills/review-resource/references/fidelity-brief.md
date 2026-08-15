@@ -51,20 +51,30 @@ in reading order so nothing is skipped, and specifically cover:
    magnitude: "20% improvement" and "20 percentage points" are different claims,
    and so are "reported by the authors" and "measured here".
 
-4. **The structural claims** — what the page says the source's taxonomy,
+4. **Every figure, checked against the saved image file itself, not against the
+   source's original caption.** Open each `assets/images/<slug>/*` file the page
+   actually uses and read its `alt` text and figcaption against what is literally
+   in the pixels — panel by panel, curve by curve, axis label by axis label. This
+   is a different check from confirming the source's own figure exists: a crop can
+   be complete-looking and still be missing a panel its own alt text describes, or
+   include page furniture (a running head, a rule) nothing on the page accounts
+   for. Also flag any reading of a plotted value ("the gap is widest at X") that
+   isn't actually what the curve shows when you look at it directly.
+
+5. **The structural claims** — what the page says the source's taxonomy,
    architecture or argument contains, and any section numbers it cites. Open those
    sections and confirm they exist and say what the page claims.
 
-5. **The bibliography.** Every entry must name a real paper with the right
+6. **The bibliography.** Every entry must name a real paper with the right
    authors, venue and year. A wrong given name is unfalsifiable by eye, so check
    each against the source's own reference list where it appears there. Flag
    anything wrong or invented.
 
-6. **The byline and any quotation.** Confirm the author list matches the source's
+7. **The byline and any quotation.** Confirm the author list matches the source's
    own front matter exactly, in order, with correct spellings. Confirm every
    quoted passage is verbatim and that its attribution is right.
 
-7. **Any critical judgement the page makes about the source.** {{JUDGEMENTS}}
+8. **Any critical judgement the page makes about the source.** {{JUDGEMENTS}}
    These are deliberate editorial positions, but they are claims the page makes and
    are fair game. If one is factually wrong, that is a **serious** finding.
 
