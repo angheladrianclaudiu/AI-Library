@@ -1211,7 +1211,66 @@ recording a clean bill of health it had not earned.
 
 ---
 
-## Session template
+## Session 16 — fixing the equation overflow bug on four already-published pages (no new ingest)
+
+**Source:** none — a follow-up to session 15's `verify_page.py` change, fixing the four
+pages the new `.eq__math` overflow check flagged: `context-engineering-survey`,
+`slopcodebench`, `stealing-reasoning-traces` and `llm-field-guide`. Six overflowing
+equations across the four pages, all fixed the same way: shorten the formula and move
+anything cut into `.eq__read`, or — for `llm-field-guide`'s KV-cache formula, which is
+long because every variable name is intentionally descriptive rather than a single
+letter — wrap it onto multiple lines inside the `white-space: pre` block instead of
+abbreviating the names, since the readability of `kv_heads`/`bytes_per_value` is the
+point of that particular equation.
+
+**What worked first time:**
+
+- `stealing-reasoning-traces` has a committed builder script
+  (`assets/scripts/stealing-reasoning-traces.build_content.py`); running it reproduced
+  the committed page byte-for-byte before any edit, confirming the safe starting point
+  without needing `recover_content_json.py` at all.
+- For the other three, `recover_content_json.py --verify`'s round-trip failed on the
+  already-documented harmless diff (session 6: a hard-wrapped colophon paragraph and an
+  apostrophe entity) for `context-engineering-survey` and `slopcodebench` — expected, and
+  the recovered JSON was safe to use.
+- Shortening a formula by tightening spacing and moving descriptive clauses into
+  `.eq__read` (rather than deleting content) held up across every fix — nothing was lost,
+  each equation just got more compressed. Confirmed each one still renders correctly and
+  reads sensibly with a phone-width screenshot before moving to the next page.
+
+**What broke:**
+
+1. **`recover_content_json.py`'s round-trip failure on `llm-field-guide` was not the
+   known harmless diff — it silently dropped two real fields.** The recovered JSON fell
+   back to the generic guide default colophon text instead of the page's actual custom
+   `colophon_note`, and dropped `"scripts": ["assets/fieldguide.js"]` entirely. Rebuilding
+   from that recovery without reading the diff closely would have shipped a page with
+   every interactive widget dead (no script tag to load `fieldguide.js`) and the guide's
+   real attribution swapped for boilerplate — a much worse outcome than the equation bug
+   being fixed. Caught only because the `--verify` diff was read line by line instead of
+   pattern-matched against the session-6 precedent and dismissed. Fixed by hand-patching
+   both fields into the recovered JSON from the diff's own "before" text, then confirming
+   a genuinely byte-exact round-trip before touching anything else. Logged in `TASKS.md`
+   — `recover_content_json.py` should detect a non-default footer paragraph and a
+   post-`app.js` script tag and recover both automatically.
+2. **`colophon_note` needed a list, not a string, to reproduce two separate `<p>` tags**,
+   and needed each list item to start with `<p>` so `as_paragraphs()` passed it through
+   unescaped — passing plain strings round-tripped with `'` silently converted to
+   `&#x27;`, which is the exact session-6 diff shape, this time self-inflicted rather than
+   inherited.
+3. **Fixing the equation on `slopcodebench` surfaced a second, unrelated bug in the same
+   `verify_page.py` run**: five bibliography entries with zero inline citations anywhere
+   in the body, the same failure session 10 recorded on a different page. Left unfixed
+   and logged in `TASKS.md` rather than expanding this session's scope — but worth noting
+   that running the checker for one reason surfaced an unrelated real defect for free,
+   which is the same thing that happened when the `.eq__math` check itself first shipped.
+
+**Tooling notes for this environment:**
+
+- **`verify_page.py` on `llm-field-guide` needs a long timeout, not a fix.** The first
+  attempt hit the harness's 2-minute default and looked like a hang; a 240-second budget
+  completed normally. The guide has more images and interactive widget JS than a typical
+  paper page, and that's just slower to settle to `networkidle`, not broken.
 
 ```
 ## Session N — <title> (<identifier>)
