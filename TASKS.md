@@ -160,6 +160,14 @@ source that caused it.
 
 ## Site and HTML
 
+- [ ] **`verify_page.py` doesn't check `.eq__math` for overflow.** The component is
+      `white-space: pre` with `overflow-x: auto`, so a line too long for the box scrolls
+      silently rather than visibly breaking — invisible in a screenshot, only caught by
+      comparing `clientWidth` to `scrollWidth` in the browser. Session 13 shipped two
+      overflowing equations this way (1685px and 1020px of content in a 672px box) before
+      catching it by hand. `verify_page.py` already has the pattern for exactly this shape
+      of bug (the wide-table scroll-container check); add a loop over `.eq__math` elements
+      asserting `scrollWidth <= clientWidth`, or close to it, at desktop width.
 - [ ] **Full-text search.** The index currently searches title, authors, venue, tags and
       the card hook only. Fine at a handful of resources, weak past ~20. Bake a
       per-resource text index into `index.html` at rebuild time and search that — keeping
