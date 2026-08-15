@@ -16,6 +16,11 @@
 - [ ] Each figure kept was actually looked at, and is cropped to the artwork —
       no slabs of body text, no clipped edges.
 - [ ] Every figure has your own caption saying what it shows *and why it matters*.
+- [ ] The caption and `alt` describe *only* what's actually in the crop — re-look at
+      the saved image file after writing them, not just once before choosing it. A
+      crop can be legible and still be missing a panel the source's own caption
+      described, and that's invisible unless the final image and the final wording
+      are checked against each other, not each against the source separately.
 - [ ] Every `<img>` has a descriptive `alt`, plus `width` and `height`.
 - [ ] Unused candidates deleted from `assets/images/<slug>/`.
 - [ ] `ls assets/images/<slug>/` matches exactly the images the page references.
