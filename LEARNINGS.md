@@ -1283,3 +1283,155 @@ point of that particular equation.
 
 **Non-extraction findings:**
 ```
+
+---
+
+## Session 17 — Intuition to Evidence: Measuring AI's True Impact on Developer Productivity (arXiv:2509.19708)
+
+**Source:** 16 pages, ~8,900 words (extractor's count, inflated by ~50 full-citation
+references on pp.14–16), 4.2 MB. An arXiv LaTeX build (`arXiv GenPDF`/`pikepdf`) of an
+industry case study — engineers at 1mg, an Indian healthtech company, reporting on a
+year-long deployment of their own in-house AI coding platform, DeputyDev, across 300
+engineers. 10 figure candidates, all pre-rendered matplotlib/seaborn charts embedded as
+rasters, plus five data tables transcribed as prose or real `<table>` markup.
+
+**What worked first time:**
+
+- **The embedded-image pass alone was sufficient, 10 candidates for 10 real figures**, zero
+  cropping needed — a sixth data point (after sessions 7, 9, 10, 13) for "pre-rendered raster
+  charts extract cleanly," and the first one that isn't a Google Docs or Nature/Springer
+  export: this is a LaTeX-built arXiv preprint whose author chose to embed PNG charts rather
+  than vector TikZ. The discriminator sessions 3 and 7 already identified (how the figure was
+  *made*, not what pipeline produced the PDF) held again.
+- **Title, year and `source_url` all landed clean** — `find_arxiv_id()`'s front-matter-only
+  scoping (fixed session 9) correctly ignored the paper's own citations to unrelated arXiv IDs
+  in its 50-entry bibliography.
+
+**What broke — both already-tracked failure modes, reconfirmed:**
+
+1. **Author detection returned 4 of 11 authors.** `guess_authors()`'s known stacked-byline
+   failure (sessions 2, 3, 9, 11); `pdf_metadata.author` held the correct semicolon-delimited
+   full list, so the fix was a direct substitution. No new code change — TASKS.md's existing
+   item covers it.
+2. **`pdf_metadata.doi` picked up a citation's DOI, not the paper's own.** Exactly the bug
+   TASKS.md already logs from session 11: this arXiv preprint has no DOI, but the extractor
+   returned `10.1145/3661167.3661183` — which belongs to reference [20] (Watanabe et al.,
+   EASE '24), cited in this paper's own bibliography. Caught by grepping the extracted text
+   for the DOI string and finding it sitting inside a citation, not the front matter. Second
+   confirming data point for the open TASKS.md item; still not fixed at the code level.
+
+**The adversarial review is the real story this session — three full rounds, on a source that
+turned out to be unusually rich in genuine, checkable self-contradictions** because it's an
+industry self-report: the same team built DeputyDev, deployed it, and wrote the paper
+evaluating it, with real dollar figures and real internal tables rather than benchmark scores.
+That combination produced far more source-side errors than any prior ingest, and the fixing
+process produced its own errors in turn — both are recorded below since they're different
+lessons.
+
+**What the source itself got wrong, found across three rounds:**
+
+- **A figure's own summary box computes a different statistic than the text, unlabelled.**
+  Figure 1's "Improvement: 60.1% cycle time reduction" box matches neither the paper's 33.8%
+  nor 29.8% nor 31.8% headline figures — but it isn't a copy-paste error either. Reading the
+  chart's own first and last plotted points (Sept 2024: 146.2h; Aug 2025: 58.4h) gives
+  (146.2−58.4)/146.2 = 60.05%, an internally consistent endpoint-to-endpoint calculation the
+  box just never labels as such. **Round 1's first pass at this asserted a specific wrong
+  mechanism** ("apparently pasted into the wrong box," reasoning from the coincidence that
+  60.1% also happens to be a different table's growth figure) **without first trying the
+  simple arithmetic that fully explained it** — caught and corrected in round 2 by reading the
+  image's own numbers rather than pattern-matching to a nearby number. Worth a standing habit:
+  before asserting *how* a numeric mismatch happened, exhaust the boring arithmetic
+  explanations using the source's own visible data before reaching for a narrative one.
+- **A cost table's row doesn't sum to its own printed total, and the error propagates to the
+  grand total.** July's LLM-plus-infrastructure columns sum to $9,257; the table prints
+  $8,257. The same $1,000 gap reappears between the column-total sum ($47,833) and the printed
+  grand total ($46,833) — one typo, two places. The paper's own prose compounds it, separately
+  claiming "July showed the lowest" cost, when April's printed total ($5,864) is lower than
+  July's either way. Found in round 2 by re-deriving every row of a table the page was already
+  quoting numbers from — worth doing on every table a page transcribes, not just the ones that
+  look suspicious.
+- **Two "matched" cohorts have baselines 50% apart, and one cohort's definition is a
+  copy-paste of the other's.** The paper states both a high- and low-adoption cohort were
+  "matched … on … historical productivity baseline," but their own pre-adoption LOC totals
+  (168,676 vs. 253,332) differ by 50%. Separately, the low-adoption group's definition bullet
+  ("minimal engagement") is followed by "Review interaction rate: >80% of PRs engaged with AI
+  feedback" — word-for-word identical to the high-adoption group's bullet, which cannot be
+  true of a "minimal engagement" group. Both found by reading a methods section's bullet lists
+  against each other rather than reading each bullet in isolation.
+- **A results table reads as a relabelled subset, not the org-wide figure its own word
+  implies.** Table 3's "Overall 60.1%" total (167,047→267,509) can't be the full 300-engineer
+  org — it's smaller than a single 30-person subgroup's baseline reported two paragraphs
+  earlier — and turns out to sit within 2% of the high-adoption cohort's own numbers from a
+  different figure. The paper never says the two are the same population; the page says so
+  only after checking the arithmetic, not from the label.
+- **A conclusion relabels one survey answer as a different, higher one.** The paper's
+  conclusion states "57% satisfaction for code generation," which is neither the 62% the
+  results section reports for that question nor a real synonym — it's the same survey's
+  answer to a completely different question ("Perceived plug-in helpfulness | 57% say Yes"),
+  reused two pages later under the wrong label.
+- **An adoption curve's prose doesn't match the figure it cites.** "Accelerated in months 2-3,
+  reaching peak … by month 6, … stabilising … for the remainder" — but month 3 (May) *fell*
+  from month 2, the chart only has six months of data total, and the 83% peak *is* the last
+  data point, leaving no "remainder" for anything to stabilize into.
+- **A definitional gloss the page itself supplied was contradicted by the same figure it was
+  glossing.** The page's first draft called "cycle time" industry-standard shorthand for
+  "PR open to merge" — a reasonable-sounding inference, and wrong: Figure 1's September 2024
+  point shows review time (148h) *exceeding* cycle time (146.2h), which can't happen if cycle
+  time contains review time as a sub-interval. Caught in round 2 by reading all twelve months
+  of a chart the page had already used, not just the two months the headline claim needed.
+
+**What the fixing process itself got wrong, across rounds — the more useful lesson:**
+
+- **A section fixed in isolation left a contradiory sentence in a section that wasn't
+  touched.** Round 1 rewrote the Adoption section's narrative (correctly) but left the TL;DR's
+  parallel sentence repeating the paper's original, now-debunked "peaked at 83%... then
+  settling near 60%" framing — so the page's own two summaries of the same fact disagreed with
+  each other until round 2 caught it. A rewritten claim needs grepped for every other place it
+  appears, not just fixed at its most detailed occurrence.
+- **Establishing a fact in one sentence didn't stop the next sentence from contradicting it.**
+  Having just argued Table 3 isn't the full 300-engineer org, the very next paragraph explained
+  a data quirk by appeal to "the 300-person sample" — a scope word that survived from before
+  the surrounding claim was corrected.
+- **New evidence written to support a claim overstated its own precision.** Round 1's finding
+  that Table 3 ≈ the high-adoption cohort was accurate at the headline level, but the
+  supporting arithmetic added in round 2 claimed two pairs of numbers were both "within 1%"
+  when only one pair was (the other was 1.7%), and separately claimed an accept-rate "matched"
+  between two figures that actually differed by 5%. Precision claims added to *strengthen* an
+  argument are exactly as failure-prone as the original content — arguably more so, since
+  they're usually written fastest, right after the underlying finding lands.
+- **A subagent's confirmation of an earlier finding can itself be an over-read.** Round 1's
+  reviewer called the six-vs-seven review-agent count discrepancy "confirmed, and stronger
+  than the page states" after noting Figure 3's diagram draws only six boxes. Round 2's
+  independent read of the identical diagram reached the opposite interpretation — six boxes
+  omitting a nonadversarial Summary pass is a plausible, non-erroneous explanation, not
+  reinforcing evidence of sloppiness — and the table's own caption ("specialized agents,"
+  unqualified, for all seven rows) only partially resolves which reading is right. Adjudicated
+  by softening the page's claim to present both readings rather than picking one, since the
+  underlying evidence is genuinely ambiguous, not because either subagent was careless.
+
+**On running three rounds instead of two.** This is a second data point (after LEARNINGS
+session 15) that a page can pass a real, substantive first-and-second-round cycle and still
+have a third round land real findings — though the trend across this session's three rounds
+was clearly diminishing: round 1 found ~20 issues including the page's most severe (a false
+causal narrative about a data-entry error), round 2 found ~12 including the single strongest
+catch of the whole session (the cost table's arithmetic error) alongside several
+self-contradictions round 1's own fixes introduced, and round 3 found ~8, all precision issues
+in round 2's newest prose, with zero fresh source misreadings. Stopped after round 3 on that
+basis — not because a rule says three is enough, but because the marginal round had visibly
+stopped finding new *classes* of defect and was down to refining arithmetic precision in
+recently-written sentences. Whether a fourth round would find anything is, per session 15,
+still untested territory this session didn't need to enter.
+
+**Tooling notes for this environment:**
+
+- **Independently re-deriving a subagent's arithmetic before accepting it caught nothing new
+  this session, but was worth doing anyway** — every headline finding (the Figure 1 endpoint
+  math, the $1,000 table error, the matched-baseline gap) was re-computed from the source text
+  or the image directly during adjudication, using `grep`/`sed` on the page-marked source dump
+  and `Read` on the WebP figures, rather than trusting the subagent's quoted arithmetic. Cheap
+  relative to the cost of shipping a wrong number about a paper whose whole angle is catching
+  other people's wrong numbers.
+- **`extract_pdf.py --slug` cleanly re-runs extraction under a shorter slug** when the
+  detected title produces an unwieldy default (`intuition-to-evidence-measuring-ais-true...`
+  → `deputydev-productivity-study`) — simpler than renaming the text/figures JSON and the
+  images directory by hand after the fact.
