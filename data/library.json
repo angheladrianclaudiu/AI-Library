@@ -21,6 +21,27 @@
     "added": "2026-08-15"
   },
   {
+    "slug": "deputydev-productivity-study",
+    "title": "Intuition to Evidence: Measuring AI's True Impact on Developer Productivity",
+    "type": "paper",
+    "authors": "Anand Kumar, Vishal Khare, Deepak Sharma, Satyam Kumar, Vijay Saini, Anshul Yadav, Sachendra Jain, Ankit Rana, Pratham Verma, Vaibhav Meena, and Avinash Edubilli",
+    "venue": "arXiv preprint",
+    "year": 2025,
+    "tags": [
+      "coding-agents",
+      "code-quality",
+      "production",
+      "evaluation"
+    ],
+    "hook": "300 engineers at the Indian healthtech company 1mg used an in-house AI coding platform for a year, and the team that built it measured what happened: a 31.8% drop in PR review cycle time, adoption that spent months near 60% before jumping to an 83% peak in the study's final month, and a productivity gain that tracked usage intensity almost exactly — engineers who barely touched the tool shipped less code, not more.",
+    "read_minutes": 23,
+    "words": 5062,
+    "page": "pages/deputydev-productivity-study.html",
+    "source_url": "https://arxiv.org/abs/2509.19708",
+    "pdf": null,
+    "added": "2026-08-15"
+  },
+  {
     "slug": "stealing-reasoning-traces",
     "title": "Stealing Reasoning Traces from Proprietary LLM APIs",
     "type": "paper",
